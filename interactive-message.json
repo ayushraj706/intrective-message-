@@ -1,7 +1,7 @@
 {
   "welcome": {
     "type": "list",
-    "body": "Namaste {{name}}, BaseKey aur SuperKey ke official platform par aapka swagat hai. Main Ayush Raj aapki kaise madad kar sakta hoon?",
+    "body": "Namaste _*{{name}}*_, BaseKey aur SuperKey ke official platform par aapka swagat hai. Main aapki kaise madad kar sakta hoon?",
     "rows": [
       { "id": "basekey_hub", "title": "BaseKey Platform", "description": "WhatsApp Automation" },
       { "id": "superkey_hub", "title": "SuperKey Services", "description": "Gov Tenders & IT" },
