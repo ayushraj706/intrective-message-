@@ -2,43 +2,22 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 
-// --- AAPKI FIXED IDs ---
-const MY_PHONE_NUMBER_ID = "1027373887121315"; // Aapki Real Phone ID
-const MY_WABA_ID = "902144092406469";          // Aapki WhatsApp Business Account ID
-
 export default async function handler(req, res) {
   const jsonPath = path.join(process.cwd(), 'interactive-message.json');
   const interactivePayload = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
 
-  // 1. WEBHOOK VERIFICATION (GET)
-  if (req.method === 'GET') {
-    const mode = req.query['hub.mode'];
-    const token = req.query['hub.verify_token'];
-    const challenge = req.query['hub.challenge'];
-
-    if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
-      console.log('✅ Webhook Verified!');
-      return res.status(200).send(challenge);
-    }
-    return res.status(403).send('Forbidden');
-  }
-
-  // 2. MESSAGE HANDLING (POST)
   if (req.method === 'POST') {
     const body = req.body;
     
-    // Meta se jo data aaya use log mein dekhna (Davav banane ke liye monitoring zaruri hai)
-    console.log(`📩 Incoming from WABA ID: ${body.entry?.[0]?.id || 'Unknown'}`);
-
     if (body.object && body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
       const value = body.entry[0].changes[0].value;
-      const message = value.messages[0];
-      const from = message.from; 
-
-      // BUG FIX: Jis ID par message aaya hai, reply usi se jayega
+      const from = value.messages[0].from; 
+      
+      // 🔥 MASTER FIX: ID ab meta ke incoming data se dynamic uthayega
+      // Agar +1 pe msg aaya toh +1 ki ID lega, agar +91 pe aaya toh +91 ki lega
       const activePhoneNumberId = value.metadata.phone_number_id; 
-
-      console.log(`Reply switching to active ID: ${activePhoneNumberId}`);
+      
+      console.log(`Dynamic Reply from ID: ${activePhoneNumberId} to User: ${from}`);
 
       try {
         await axios.post(
@@ -58,21 +37,20 @@ export default async function handler(req, res) {
               }
             }
           },
-          { 
-            headers: { 
-              Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-              'Content-Type': 'application/json'
-            } 
-          }
+          { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } }
         );
 
-        console.log(`🚀 Success: Reply sent from ${activePhoneNumberId} to ${from}`);
-        return res.status(200).json({ status: 'sent', waba_id: MY_WABA_ID });
+        return res.status(200).json({ status: 'success', sent_from: activePhoneNumberId });
       } catch (error) {
-        console.error('❌ Meta API Error:', error.response?.data || error.message);
-        return res.status(500).json({ error: 'Failed to send' });
+        console.error('❌ Meta Error:', error.response?.data || error.message);
+        return res.status(500).json({ error: 'Failed' });
       }
     }
     return res.status(200).send('OK');
+  }
+  
+  // Verification part... (GET method handle karein as usual)
+  if (req.method === 'GET') {
+    return res.status(200).send(req.query['hub.challenge']);
   }
 }
