@@ -54,7 +54,19 @@
       { "id": "basekey_hub", "title": "BaseKey Platform", "description": "WhatsApp Automation" },
       { "id": "superkey_hub", "title": "SuperKey Services", "description": "Gov Tenders & IT" },
       { "id": "tools_hub", "title": "Explore Tools", "description": "LockerKey & More" },
-      { "id": "contact_us", "title": "Contact Us", "description": "" }
+      { "id": "contact_us", "title": "Contact Us", "description": "Call Support" },
+      { "id": "lang_1", "title": "Change Language", "description": "Select another language" }
+    ]
+  },
+  "main_menu": {
+    "type": "list",
+    "body": "Wapas Main Menu par swagat hai {{name}}. Agla kadam kya hoga?",
+    "rows": [
+      { "id": "basekey_hub", "title": "BaseKey", "description": "" },
+      { "id": "superkey_hub", "title": "SuperKey", "description": "" },
+      { "id": "tools_hub", "title": "More Tools", "description": "" },
+      { "id": "contact_us", "title": "Contact Us", "description": "" },
+      { "id": "lang_1", "title": "Change Language", "description": "Bhasha badlein" }
     ]
   },
   "contact_us": {
@@ -73,25 +85,9 @@
       { "id": "bk_web", "title": "Visit BaseKey" }
     ]
   },
-  "bk_features": {
-    "type": "reply",
-    "body": "BaseKey Features:\n1. Shared Team Inbox\n2. Interactive Buttons & Lists\n3. Automated Chatbot Flow\n4. Real-time Analytics.",
-    "buttons": [
-      { "id": "bk_pricing", "title": "Pricing Plans" },
-      { "id": "main_menu", "title": "Main Menu" }
-    ]
-  },
-  "bk_pricing": {
-    "type": "reply",
-    "body": "BaseKey Plans:\n- Startup: Free (Trial)\n- Business: ₹999/Month\n- Enterprise: Custom pricing for high volume.",
-    "buttons": [
-      { "id": "contact_sales", "title": "Contact Sales" },
-      { "id": "main_menu", "title": "Main Menu" }
-    ]
-  },
   "bk_web": {
     "type": "cta_url",
-    "body": "BaseKey ki official website aur documentation dekhne ke liye niche click karein.",
+    "body": "BaseKey ki official website dekhne ke liye niche click karein.",
     "button_text": "Open BaseKey",
     "url": "https://ayus.fun"
   },
@@ -101,7 +97,7 @@
     "buttons": [
       { "id": "sk_gov", "title": "Gov Tenders (CPPP)" },
       { "id": "sk_dev", "title": "Web Development" },
-      { "id": "sk_udyam", "title": "Registration Info" }
+      { "id": "main_menu", "title": "Main Menu" }
     ]
   },
   "sk_gov": {
@@ -168,16 +164,6 @@
     "body": "Aap humein +91 9229966001 par call kar sakte hain ya care@ayus.fun par email bhej sakte hain.",
     "buttons": [
       { "id": "main_menu", "title": "Main Menu" }
-    ]
-  },
-  "main_menu": {
-    "type": "list",
-    "body": "Wapas Main Menu par swagat hai {{name}}. Agla kadam kya hoga?",
-    "rows": [
-      { "id": "basekey_hub", "title": "BaseKey" },
-      { "id": "superkey_hub", "title": "SuperKey" },
-      { "id": "tools_hub", "title": "More Tools" },
-      { "id": "contact_us", "title": "Contact Us" }
     ]
   }
 }
