@@ -1,20 +1,78 @@
 {
-  "content": "Hello! Welcome to BaseKey. Aap hamari website check kar sakte hain ya AI agent se baat kar sakte hain. \n\nWebsite: ayus.fun",
-  "content_type": "input_select",
-  "content_attributes": {
-    "items": [
-      {
-        "title": "Visit Website",
-        "value": "visit_website_click"
-      },
-      {
-        "title": "Chat with AI",
-        "value": "ai_chat_click"
-      },
-      {
-        "title": "Next Move",
-        "value": "next_move_click"
-      }
+  "welcome": {
+    "body": "Namaste {{name}}! 🙏 BaseKey aur SuperKey ke official bot mein aapka swagat hai. Main aapki kaise madad kar sakta hoon?",
+    "buttons": [
+      { "id": "explore_basekey", "title": "BaseKey Platform" },
+      { "id": "about_superkey", "title": "About SuperKey" },
+      { "id": "other_tools", "title": "Other Tools" }
+    ]
+  },
+  "explore_basekey": {
+    "body": "BaseKey ek Advanced WhatsApp Business Platform hai jahan se aap bulk messages, chatbots aur automation set kar sakte hain. Kya dekhna chahenge?",
+    "buttons": [
+      { "id": "bk_features", "title": "Features 🔥" },
+      { "id": "bk_pricing", "title": "Pricing 💰" },
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "bk_features": {
+    "body": "BaseKey Features:\n1. Interactive Buttons\n2. Shared Team Inbox\n3. CRM Integration\n4. Automated Flow Builder.",
+    "buttons": [
+      { "id": "bk_demo", "title": "Get Free Demo" },
+      { "id": "bk_pricing", "title": "Check Pricing" },
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "bk_pricing": {
+    "body": "Humare plans aapke business ke hisaab se hain:\n- Startup: Free (Trial)\n- Professional: ₹999/mo\n- Enterprise: Custom Solution.",
+    "buttons": [
+      { "id": "contact_sales", "title": "Talk to Sales" },
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "about_superkey": {
+    "body": "SuperKey ek registered business hai jo Bihar ke Samastipur se chalti hai. Hum tech-solutions aur government tenders (CPPP) par kaam karte hain.",
+    "buttons": [
+      { "id": "sk_services", "title": "Our Services" },
+      { "id": "sk_registration", "title": "Registration Info" },
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "sk_services": {
+    "body": "SuperKey Services:\n1. Web Development\n2. Startup Hosting\n3. IT Consulting\n4. Gov Tender Bidding.",
+    "buttons": [
+      { "id": "sk_portfolio", "title": "Portfolio" },
+      { "id": "contact_us", "title": "Contact Us" },
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "sk_registration": {
+    "body": "SuperKey 'SuperKey' naam se registered hai aur humare paas Udyam Registration aur CPPP enrollment bhi hai.",
+    "buttons": [
+      { "id": "sk_services", "title": "Check Services" },
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "other_tools": {
+    "body": "Hamare doosre projects:\n1. LockerKey: Password Manager\n2. APK Builder\n3. 3D Animation Tools.",
+    "buttons": [
+      { "id": "tool_lockerkey", "title": "LockerKey Details" },
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "tool_lockerkey": {
+    "body": "LockerKey aapke passwords ko secure rakhta hai. Ye ek Android App hai jo offline aur online dono kaam karti hai.",
+    "buttons": [
+      { "id": "download_link", "title": "Download App" },
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "main_menu": {
+    "body": "Wapas Main Menu par aa gaye hain. Aage kya karna hai {{name}}?",
+    "buttons": [
+      { "id": "explore_basekey", "title": "BaseKey" },
+      { "id": "about_superkey", "title": "SuperKey" },
+      { "id": "other_tools", "title": "More Tools" }
     ]
   }
 }
