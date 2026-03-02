@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 export default async function handler(req, res) {
-  // JSON file ko manually read karne ka tarika (Sabse safe)
+  // JSON ko manually read karne ka rasta (Sabse safe aur error-free)
   const jsonPath = path.join(process.cwd(), 'interactive-message.json');
   const interactivePayload = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
 
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   // --- 2. MESSAGE HANDLING (POST) ---
   if (req.method === 'POST') {
     const body = req.body;
-    console.log('📩 Incoming Webhook:', JSON.stringify(body, null, 2));
+    console.log('📩 Incoming Message:', JSON.stringify(body, null, 2));
 
     if (body.object && body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
       const message = body.entry[0].changes[0].value.messages[0];
