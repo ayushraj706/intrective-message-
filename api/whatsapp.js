@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
@@ -7,6 +6,7 @@ import path from 'path';
 const REAL_PHONE_ID = "1027373887121315"; 
 
 export default async function handler(req, res) {
+  // JSON ko safe tarike se read karna
   const jsonPath = path.join(process.cwd(), 'interactive-message.json');
   const interactivePayload = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
 
@@ -18,20 +18,21 @@ export default async function handler(req, res) {
   // Message Handling (POST)
   if (req.method === 'POST') {
     const body = req.body;
+    console.log('📩 Incoming Webhook:', JSON.stringify(body, null, 2));
+
     const value = body.entry?.[0]?.changes?.[0]?.value;
 
     if (value && value.messages) {
       const incomingId = value.metadata.phone_number_id;
 
-      // 1. BLOCK TEST NUMBER: Agar ID real wali nahi hai, toh block kar do
+      // Agar ID real wali nahi hai (jaise 555...), toh block kar do
       if (incomingId !== REAL_PHONE_ID) {
-        console.log(`🚫 Blocking test message from ID: ${incomingId}`);
+        console.log(`🚫 Blocked Test ID: ${incomingId}`);
         return res.status(200).send('Blocked'); 
       }
 
-      // 2. ONLY PROCESS REAL NUMBER (+91 92299 66001)
       const from = value.messages[0].from;
-      console.log(`✅ Received message on Real Number from: ${from}`);
+      console.log(`✅ Processing Real Number Message from: ${from}`);
 
       try {
         await axios.post(
@@ -51,12 +52,17 @@ export default async function handler(req, res) {
               }
             }
           },
-          { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } }
+          { 
+            headers: { 
+              Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+              'Content-Type': 'application/json'
+            } 
+          }
         );
         return res.status(200).json({ status: 'success' });
       } catch (error) {
         console.error('❌ Meta API Error:', error.response?.data || error.message);
-        return res.status(500).json({ error: 'Failed' });
+        return res.status(500).json({ error: 'Failed to send reply' });
       }
     }
     return res.status(200).send('OK');
