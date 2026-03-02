@@ -35,9 +35,9 @@
     "type": "list",
     "body": "Select your language (21-30):",
     "rows": [
+      { "id": "lang_sa", "title": "Sanskrit", "description": "संस्कृतम्" },
       { "id": "lang_sd", "title": "Sindhi", "description": "سنڌي" },
       { "id": "lang_doi", "title": "Dogri", "description": "डोगरी" },
-      { "id": "lang_sa", "title": "Sanskrit", "description": "संस्कृतम्" },
       { "id": "lang_mni", "title": "Manipuri", "description": "মৈতৈলোন" },
       { "id": "lang_brx", "title": "Bodo", "description": "बड़ो" },
       { "id": "lang_ar", "title": "Arabic", "description": "العربية" },
@@ -73,9 +73,25 @@
       { "id": "bk_web", "title": "Visit BaseKey" }
     ]
   },
+  "bk_features": {
+    "type": "reply",
+    "body": "BaseKey Features:\n1. Shared Team Inbox\n2. Interactive Buttons & Lists\n3. Automated Chatbot Flow\n4. Real-time Analytics.",
+    "buttons": [
+      { "id": "bk_pricing", "title": "Pricing Plans" },
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "bk_pricing": {
+    "type": "reply",
+    "body": "BaseKey Plans:\n- Startup: Free (Trial)\n- Business: ₹999/Month\n- Enterprise: Custom pricing for high volume.",
+    "buttons": [
+      { "id": "contact_sales", "title": "Contact Sales" },
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
   "bk_web": {
     "type": "cta_url",
-    "body": "BaseKey ki official website dekhne ke liye niche click karein.",
+    "body": "BaseKey ki official website aur documentation dekhne ke liye niche click karein.",
     "button_text": "Open BaseKey",
     "url": "https://ayus.fun"
   },
@@ -85,6 +101,72 @@
     "buttons": [
       { "id": "sk_gov", "title": "Gov Tenders (CPPP)" },
       { "id": "sk_dev", "title": "Web Development" },
+      { "id": "sk_udyam", "title": "Registration Info" }
+    ]
+  },
+  "sk_gov": {
+    "type": "reply",
+    "body": "SuperKey Central Public Procurement Portal (CPPP) par registered hai aur hum government tenders ke liye bid karte hain.",
+    "buttons": [
+      { "id": "sk_services", "title": "Services List" },
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "sk_udyam": {
+    "type": "reply",
+    "body": "SuperKey Udyam registered business hai jo MSME ke tahat manyata prapt hai. Ye firm digital empowerment par kendrit hai.",
+    "buttons": [
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "sk_dev": {
+    "type": "reply",
+    "body": "Hum custom web applications, API integrations aur cloud hosting solutions provide karte hain.",
+    "buttons": [
+      { "id": "sk_portfolio", "title": "View Portfolio" },
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "sk_portfolio": {
+    "type": "cta_url",
+    "body": "Humare pichle projects aur school website examples yahan dekhein.",
+    "button_text": "Open Portfolio",
+    "url": "https://ayus.fun"
+  },
+  "tools_hub": {
+    "type": "reply",
+    "body": "Ayush Raj dwara develop kiye gaye special tools aur applications ki list yahan hai.",
+    "buttons": [
+      { "id": "tool_lockerkey", "title": "LockerKey" },
+      { "id": "tool_animation", "title": "3D Animation" },
+      { "id": "tool_crawler", "title": "Web Crawler" }
+    ]
+  },
+  "tool_lockerkey": {
+    "type": "reply",
+    "body": "LockerKey ek secure password manager app hai jo aapke sensitive data ko encrypt karke safe rakhta hai.",
+    "buttons": [
+      { "id": "lk_web", "title": "LockerKey Web" },
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "lk_web": {
+    "type": "cta_url",
+    "body": "LockerKey dashboard par jaane ke liye niche diye gaye link ka upyog karein.",
+    "button_text": "Access LockerKey",
+    "url": "https://ayus.fun"
+  },
+  "tool_animation": {
+    "type": "reply",
+    "body": "Hum realistic 3D character animation banate hain (PUBG style) jo games aur apps ke liye perfect hain.",
+    "buttons": [
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "contact_sales": {
+    "type": "reply",
+    "body": "Aap humein +91 9229966001 par call kar sakte hain ya care@ayus.fun par email bhej sakte hain.",
+    "buttons": [
       { "id": "main_menu", "title": "Main Menu" }
     ]
   },
