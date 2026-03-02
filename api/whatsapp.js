@@ -16,7 +16,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const REAL_PHONE_ID = "1027373887121315";
+const REAL_PHONE_ID = "1027373887121315"; //
 
 export default async function handler(req, res) {
   const jsonPath = path.join(process.cwd(), 'interactive-message.json');
@@ -24,19 +24,18 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const value = req.body.entry?.[0]?.changes?.[0]?.value;
-
     if (value && value.messages) {
       const msg = value.messages[0];
       const from = msg.from;
       const userName = value.contacts?.[0]?.profile?.name || "User";
 
-      // 1. Firebase Memory Check
       const userRef = doc(db, "users", from);
       const userSnap = await getDoc(userRef);
       let userLang = userSnap.exists() ? userSnap.data().lang : null;
 
       let targetKey = "welcome";
 
+      // --- 1. LANGUAGE SETTING LOGIC ---
       if (msg.type === 'interactive') {
         const replyId = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id;
         if (replyId.startsWith("lang_") && !["lang_1", "lang_2", "lang_3"].includes(replyId)) {
@@ -48,17 +47,15 @@ export default async function handler(req, res) {
         }
       }
 
-      // Agar bhasha set nahi hai, toh selection pe bhejien
-      if (!userLang && !targetKey.startsWith("lang_")) {
-        targetKey = "lang_1";
-      }
+      if (!userLang && !targetKey.startsWith("lang_")) targetKey = "lang_1";
 
       const currentMsg = messagesDB[targetKey] || messagesDB["welcome"];
       const rawBody = currentMsg.body.replace("{{name}}", userName);
       const finalLang = userLang || "hi";
 
       try {
-        // 🔥 AUTO-TRANSLATE BODY
+        // --- 2. DEEP TRANSLATION LOGIC (Body + Interactive Elements) ---
+        // Deep Words ke liye hum translator ko standard target bhasha dete hain
         const transBody = await translate(rawBody, { to: finalLang });
         
         let payload = {
@@ -68,22 +65,23 @@ export default async function handler(req, res) {
           interactive: { body: { text: transBody.text } }
         };
 
-        // --- 2. DYNAMIC LIST HANDLING (Sanskrit Included) ---
+        // A. LIST TRANSLATION (All rows & descriptions)
         if (currentMsg.type === "list") {
           const transRows = await Promise.all(currentMsg.rows.map(async (row) => {
-            // Language selection wale rows translate nahi honge
-            if (targetKey.startsWith("lang_")) return row; 
-            const t = await translate(row.title, { to: finalLang });
-            return { id: row.id, title: t.text, description: row.description || "" };
+            if (targetKey.startsWith("lang_")) return row; // Lang list ko mat badlo
+            const tTitle = await translate(row.title, { to: finalLang });
+            const tDesc = await translate(row.description || "", { to: finalLang });
+            return { id: row.id, title: tTitle.text, description: tDesc.text };
           }));
-
+          
+          const tBtnLabel = await translate("Options", { to: finalLang });
           payload.interactive.type = "list";
           payload.interactive.action = {
-            button: "Options",
-            sections: [{ title: "Select", rows: transRows }]
+            button: tBtnLabel.text,
+            sections: [{ title: "Menu", rows: transRows }]
           };
         } 
-        // --- 3. DYNAMIC BUTTON HANDLING ---
+        // B. BUTTON TRANSLATION (All button titles)
         else if (currentMsg.type === "reply" || currentMsg.buttons) {
           const transButtons = await Promise.all(currentMsg.buttons.map(async (b) => {
             const t = await translate(b.title, { to: finalLang });
@@ -92,12 +90,13 @@ export default async function handler(req, res) {
           payload.interactive.type = "button";
           payload.interactive.action = { buttons: transButtons };
         }
-        // --- 4. CTA URL HANDLING ---
+        // C. CTA URL TRANSLATION
         else if (currentMsg.type === "cta_url") {
+          const tBtnText = await translate(currentMsg.button_text, { to: finalLang });
           payload.interactive.type = "cta_url";
           payload.interactive.action = {
             name: "cta_url",
-            parameters: { display_text: currentMsg.button_text, url: currentMsg.url }
+            parameters: { display_text: tBtnText.text, url: currentMsg.url }
           };
         }
 
@@ -107,7 +106,7 @@ export default async function handler(req, res) {
 
         return res.status(200).send('OK');
       } catch (error) {
-        console.error('❌ Crash Error:', error.response?.data || error.message);
+        console.error('❌ Error:', error.message);
         return res.status(200).send('OK');
       }
     }
