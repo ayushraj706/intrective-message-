@@ -1,6 +1,22 @@
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+
+// --- Firebase Config ---
+const firebaseConfig = {
+  apiKey: "AIzaSyCCqWVSgULjZtgfOqVX3CBmOonxkr2UB7g",
+  authDomain: "whatsapp-950a8.firebaseapp.com",
+  projectId: "whatsapp-950a8",
+  storageBucket: "whatsapp-950a8.firebasestorage.app",
+  messagingSenderId: "526342181957",
+  appId: "1:526342181957:web:0e71810f3ccbb297413f2c",
+  measurementId: "G-M0336296QN"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 const REAL_PHONE_ID = "1027373887121315"; //
 
@@ -17,11 +33,29 @@ export default async function handler(req, res) {
       const from = msg.from;
       const userName = value.contacts?.[0]?.profile?.name || "User";
 
-      let targetKey = "welcome"; 
-      
-      // Check for button or list clicks
+      // --- Firebase se User ki Bhasha check karein ---
+      const userRef = doc(db, "users", from);
+      const userSnap = await getDoc(userRef);
+      let userLang = userSnap.exists() ? userSnap.data().lang : null;
+
+      let targetKey = "welcome";
+
       if (msg.type === 'interactive') {
-        targetKey = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id || "welcome";
+        const replyId = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id;
+        
+        // Agar bhasha chuni gayi hai, toh usey Firebase mein save karein
+        if (replyId.startsWith("lang_")) {
+          userLang = replyId.split("_")[1];
+          await setDoc(userRef, { lang: userLang, name: userName }, { merge: true });
+          targetKey = "welcome"; // Bhasha chunne ke baad Welcome par bhejien
+        } else {
+          targetKey = replyId;
+        }
+      }
+
+      // Agar bhasha set nahi hai, toh selection dikhayein
+      if (!userLang && targetKey !== "lang_2" && targetKey !== "lang_3") {
+        targetKey = "lang_1";
       }
 
       const currentMsg = messagesDB[targetKey] || messagesDB["welcome"];
@@ -31,29 +65,21 @@ export default async function handler(req, res) {
       try {
         let payload = { messaging_product: "whatsapp", to: from };
 
-        // 1. LIST MESSAGE (Jab 3 se zyada buttons chahiye hon)
         if (currentMsg.type === "list") {
           payload.type = "interactive";
           payload.interactive = {
             type: "list",
             body: { text: finalBody },
-            action: {
-              button: "Chuniye Option",
-              sections: [{ title: "Main Menu", rows: currentMsg.rows }]
-            }
+            action: { button: "Options", sections: [{ title: "Choose", rows: currentMsg.rows }] }
           };
-        } 
-        // 2. URL BUTTON
-        else if (currentMsg.type === "cta_url") {
+        } else if (currentMsg.type === "cta_url") {
           payload.type = "interactive";
           payload.interactive = {
             type: "cta_url",
             body: { text: finalBody },
             action: { name: "cta_url", parameters: { display_text: currentMsg.button_text, url: currentMsg.url } }
           };
-        }
-        // 3. NORMAL BUTTONS
-        else {
+        } else {
           payload.type = "interactive";
           payload.interactive = {
             type: "button",
