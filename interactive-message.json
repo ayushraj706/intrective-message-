@@ -6,12 +6,12 @@
       { "id": "basekey_hub", "title": "BaseKey Platform", "description": "WhatsApp Automation" },
       { "id": "superkey_hub", "title": "SuperKey Services", "description": "Gov Tenders & IT" },
       { "id": "tools_hub", "title": "Explore Tools", "description": "LockerKey & More" },
-      { "id": "contact_us", "title": "Contact Us", "description": "Call +919229966001" }
+      { "id": "contact_us", "title": "Contact Us", "description": "" }
     ]
   },
   "contact_us": {
     "type": "reply",
-    "body": "Hamein call karne ke liye niche diye gaye number ka upyog karein:\n\n📞 +919229966001\n\n(Note: Direct keypad wala button sirf Meta Dashboard ke 'Templates' se banta hai, par user is number par click karke call kar sakta hai).",
+    "body": "Hamein call karne ke liye niche diye gaye number ka upyog karein:\n\n📞 +919229966001\n\n",
     "buttons": [
       { "id": "main_menu", "title": "Main Menu" }
     ]
