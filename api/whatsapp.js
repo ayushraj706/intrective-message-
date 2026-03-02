@@ -1,5 +1,7 @@
-import axios from 'axios'; 
-import interactivePayload from '../interactive-message.json';
+import axios from 'axios';
+// Naye Node.js version ke liye 'with { type: "json" }' lagana zaroori hai
+import interactivePayload from '../interactive-message.json' with { type: 'json' };
+
 
 export default async function handler(req, res) {
   // --- 1. WEBHOOK VERIFICATION (GET Request) ---
