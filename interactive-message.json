@@ -1,93 +1,135 @@
 {
   "welcome": {
-    "type": "reply",
-    "body": "Namaste {{name}}, BaseKey aur SuperKey ke official bot mein aapka swagat hai. Main aapki kaise madad kar sakta hoon?",
-    "buttons": [
-      { "id": "explore_basekey", "title": "BaseKey Platform" },
-      { "id": "about_superkey", "title": "About SuperKey" },
-      { "id": "contact_us", "title": "Contact Us" }
+    "type": "list",
+    "body": "Namaste {{name}}, BaseKey aur SuperKey ke official platform par aapka swagat hai. Main Ayush Raj aapki kaise madad kar sakta hoon?",
+    "rows": [
+      { "id": "basekey_hub", "title": "BaseKey Platform", "description": "WhatsApp Automation" },
+      { "id": "superkey_hub", "title": "SuperKey Services", "description": "Gov Tenders & IT" },
+      { "id": "tools_hub", "title": "Explore Tools", "description": "LockerKey & More" },
+      { "id": "contact_us", "title": "Contact Us", "description": "Call +919229966001" }
     ]
   },
-  "explore_basekey": {
+  "contact_us": {
     "type": "reply",
-    "body": "BaseKey ek Advanced WhatsApp Business Platform hai jahan se aap bulk messages, chatbots aur automation set kar sakte hain.",
+    "body": "Hamein call karne ke liye niche diye gaye number ka upyog karein:\n\n📞 +919229966001\n\n(Note: Direct keypad wala button sirf Meta Dashboard ke 'Templates' se banta hai, par user is number par click karke call kar sakta hai).",
     "buttons": [
-      { "id": "bk_features", "title": "Features" },
-      { "id": "bk_pricing", "title": "Pricing" },
       { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "basekey_hub": {
+    "type": "reply",
+    "body": "BaseKey ek advanced WhatsApp Business API platform hai jo businesses ko automation aur bulk messaging ki suvidha deta hai.",
+    "buttons": [
+      { "id": "bk_features", "title": "Key Features" },
+      { "id": "bk_pricing", "title": "Pricing Plans" },
+      { "id": "bk_web", "title": "Visit BaseKey" }
     ]
   },
   "bk_features": {
     "type": "reply",
-    "body": "BaseKey Features:\n1. Interactive Buttons\n2. Shared Team Inbox\n3. CRM Integration\n4. Automated Flow Builder.",
+    "body": "BaseKey Features:\n1. Shared Team Inbox\n2. Interactive Buttons & Lists\n3. Automated Chatbot Flow\n4. Real-time Analytics.",
     "buttons": [
-      { "id": "bk_pricing", "title": "Check Pricing" },
+      { "id": "bk_pricing", "title": "Pricing Plans" },
       { "id": "main_menu", "title": "Main Menu" }
     ]
   },
   "bk_pricing": {
     "type": "reply",
-    "body": "Plans:\n- Startup: Free (Trial)\n- Professional: Rs 999/mo\n- Enterprise: Custom Solution.",
+    "body": "BaseKey Plans:\n- Startup: Free (Trial)\n- Business: ₹999/Month\n- Enterprise: Custom pricing for high volume.",
     "buttons": [
-      { "id": "contact_us", "title": "Talk to Sales" },
+      { "id": "contact_sales", "title": "Contact Sales" },
       { "id": "main_menu", "title": "Main Menu" }
     ]
   },
-  "about_superkey": {
+  "bk_web": {
+    "type": "cta_url",
+    "body": "BaseKey ki official website aur documentation dekhne ke liye niche click karein.",
+    "button_text": "Open BaseKey",
+    "url": "https://ayus.fun"
+  },
+  "superkey_hub": {
     "type": "reply",
-    "body": "SuperKey ek registered business hai jo Bihar ke Samastipur se chalti hai. Hum tech-solutions aur government tenders (CPPP) par kaam karte hain.",
+    "body": "SuperKey ek registered tech firm hai jo Samastipur, Bihar se operate hoti hai. Hum government projects aur digital solutions mein kaam karte hain.",
     "buttons": [
-      { "id": "sk_services", "title": "Our Services" },
-      { "id": "sk_registration", "title": "Registration Info" },
+      { "id": "sk_gov", "title": "Gov Tenders (CPPP)" },
+      { "id": "sk_dev", "title": "Web Development" },
+      { "id": "sk_udyam", "title": "Registration Info" }
+    ]
+  },
+  "sk_gov": {
+    "type": "reply",
+    "body": "SuperKey Central Public Procurement Portal (CPPP) par registered hai aur hum government tenders ke liye bid karte hain.",
+    "buttons": [
+      { "id": "sk_services", "title": "Services List" },
       { "id": "main_menu", "title": "Main Menu" }
     ]
   },
-  "sk_services": {
+  "sk_udyam": {
     "type": "reply",
-    "body": "SuperKey Services:\n1. Web Development\n2. Startup Hosting\n3. IT Consulting\n4. Gov Tender Bidding.",
-    "buttons": [
-      { "id": "sk_portfolio", "title": "Portfolio" },
-      { "id": "contact_us", "title": "Contact Us" },
-      { "id": "main_menu", "title": "Main Menu" }
-    ]
-  },
-  "sk_registration": {
-    "type": "reply",
-    "body": "SuperKey 'SuperKey' naam se registered hai. Hamare paas Udyam Registration aur CPPP enrollment uplabdha hai.",
-    "buttons": [
-      { "id": "sk_services", "title": "Check Services" },
-      { "id": "main_menu", "title": "Main Menu" }
-    ]
-  },
-  "contact_us": {
-    "type": "reply",
-    "body": "Aap humse seedha sampark karne ke liye +919229966001 par call ya WhatsApp kar sakte hain.",
+    "body": "SuperKey Udyam registered business hai jo MSME ke tahat manyata prapt hai. Ye firm digital empowerment par kendrit hai.",
     "buttons": [
       { "id": "main_menu", "title": "Main Menu" }
     ]
   },
-  "other_tools": {
+  "sk_dev": {
     "type": "reply",
-    "body": "Hamare anya projects:\n1. LockerKey: Password Manager\n2. APK Builder\n3. 3D Animation Tools.",
+    "body": "Hum custom web applications, API integrations aur cloud hosting solutions provide karte hain.",
     "buttons": [
-      { "id": "tool_lockerkey", "title": "LockerKey Details" },
+      { "id": "sk_portfolio", "title": "View Portfolio" },
       { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "sk_portfolio": {
+    "type": "cta_url",
+    "body": "Humare pichle projects aur school website examples yahan dekhein.",
+    "button_text": "Open Portfolio",
+    "url": "https://ayus.fun"
+  },
+  "tools_hub": {
+    "type": "reply",
+    "body": "Ayush Raj dwara develop kiye gaye special tools aur applications ki list yahan hai.",
+    "buttons": [
+      { "id": "tool_lockerkey", "title": "LockerKey" },
+      { "id": "tool_animation", "title": "3D Animation" },
+      { "id": "tool_crawler", "title": "Web Crawler" }
     ]
   },
   "tool_lockerkey": {
     "type": "reply",
-    "body": "LockerKey aapke passwords ko secure rakhta hai. Ye ek Android App hai jo offline aur online dono tarah se kaam karti hai.",
+    "body": "LockerKey ek secure password manager app hai jo aapke sensitive data ko encrypt karke safe rakhta hai.",
+    "buttons": [
+      { "id": "lk_web", "title": "LockerKey Web" },
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "lk_web": {
+    "type": "cta_url",
+    "body": "LockerKey dashboard par jaane ke liye niche diye gaye link ka upyog karein.",
+    "button_text": "Access LockerKey",
+    "url": "https://ayus.fun"
+  },
+  "tool_animation": {
+    "type": "reply",
+    "body": "Hum realistic 3D character animation banate hain (PUBG style) jo games aur apps ke liye perfect hain.",
+    "buttons": [
+      { "id": "main_menu", "title": "Main Menu" }
+    ]
+  },
+  "contact_sales": {
+    "type": "reply",
+    "body": "Aap humein +91 9229966001 par call kar sakte hain ya care@ayus.fun par email bhej sakte hain.",
     "buttons": [
       { "id": "main_menu", "title": "Main Menu" }
     ]
   },
   "main_menu": {
-    "type": "reply",
-    "body": "Wapas Main Menu par aa gaye hain {{name}}. Agla kadam kya hoga?",
-    "buttons": [
-      { "id": "explore_basekey", "title": "BaseKey" },
-      { "id": "about_superkey", "title": "SuperKey" },
-      { "id": "other_tools", "title": "More Tools" }
+    "type": "list",
+    "body": "Wapas Main Menu par swagat hai {{name}}. Agla kadam kya hoga?",
+    "rows": [
+      { "id": "basekey_hub", "title": "BaseKey" },
+      { "id": "superkey_hub", "title": "SuperKey" },
+      { "id": "tools_hub", "title": "More Tools" },
+      { "id": "contact_us", "title": "Contact Us" }
     ]
   }
 }
