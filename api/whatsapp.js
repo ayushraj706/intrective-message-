@@ -3,9 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
-import translate from 'google-translate-api-x'; // Auto-translation tool
+import translate from 'google-translate-api-x';
 
-// Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyCCqWVSgULjZtgfOqVX3CBmOonxkr2UB7g",
   authDomain: "whatsapp-950a8.firebaseapp.com",
@@ -24,65 +23,82 @@ export default async function handler(req, res) {
   const messagesDB = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
 
   if (req.method === 'POST') {
-    const body = req.body;
-    const value = body.entry?.[0]?.changes?.[0]?.value;
+    const value = req.body.entry?.[0]?.changes?.[0]?.value;
 
     if (value && value.messages) {
       const msg = value.messages[0];
       const from = msg.from;
       const userName = value.contacts?.[0]?.profile?.name || "User";
 
-      // 1. Firebase se Language fetch karein
+      // 1. Firebase Memory Check
       const userRef = doc(db, "users", from);
       const userSnap = await getDoc(userRef);
-      let userLang = userSnap.exists() ? userSnap.data().lang : "hi"; // Default Hindi
+      let userLang = userSnap.exists() ? userSnap.data().lang : null;
 
       let targetKey = "welcome";
 
-      // 2. Button/List Clicks
       if (msg.type === 'interactive') {
         const replyId = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id;
-        
         if (replyId.startsWith("lang_") && !["lang_1", "lang_2", "lang_3"].includes(replyId)) {
           userLang = replyId.split("_")[1];
-          await setDoc(userRef, { lang: userLang }, { merge: true });
+          await setDoc(userRef, { lang: userLang, name: userName }, { merge: true });
           targetKey = "welcome"; 
         } else {
           targetKey = replyId;
         }
       }
 
-      // Agar bhasha nahi chuni, toh selection dikhayein
-      if (!userSnap.exists() && !targetKey.startsWith("lang_")) {
+      // Agar bhasha set nahi hai, toh selection pe bhejien
+      if (!userLang && !targetKey.startsWith("lang_")) {
         targetKey = "lang_1";
       }
 
       const currentMsg = messagesDB[targetKey] || messagesDB["welcome"];
       const rawBody = currentMsg.body.replace("{{name}}", userName);
+      const finalLang = userLang || "hi";
 
       try {
-        // 🔥 MAGIC: Google Translate Body aur Buttons ko userLang mein badal dega
-        const translatedBody = await translate(rawBody, { to: userLang });
+        // 🔥 AUTO-TRANSLATE BODY
+        const transBody = await translate(rawBody, { to: finalLang });
         
         let payload = {
           messaging_product: "whatsapp",
           to: from,
           type: "interactive",
-          interactive: {
-            body: { text: translatedBody.text }
-          }
+          interactive: { body: { text: transBody.text } }
         };
 
-        // Buttons ko bhi translate karein
-        if (currentMsg.buttons) {
+        // --- 2. DYNAMIC LIST HANDLING (Sanskrit Included) ---
+        if (currentMsg.type === "list") {
+          const transRows = await Promise.all(currentMsg.rows.map(async (row) => {
+            // Language selection wale rows translate nahi honge
+            if (targetKey.startsWith("lang_")) return row; 
+            const t = await translate(row.title, { to: finalLang });
+            return { id: row.id, title: t.text, description: row.description || "" };
+          }));
+
+          payload.interactive.type = "list";
+          payload.interactive.action = {
+            button: "Options",
+            sections: [{ title: "Select", rows: transRows }]
+          };
+        } 
+        // --- 3. DYNAMIC BUTTON HANDLING ---
+        else if (currentMsg.type === "reply" || currentMsg.buttons) {
           const transButtons = await Promise.all(currentMsg.buttons.map(async (b) => {
-            const t = await translate(b.title, { to: userLang });
+            const t = await translate(b.title, { to: finalLang });
             return { type: "reply", reply: { id: b.id, title: t.text } };
           }));
           payload.interactive.type = "button";
           payload.interactive.action = { buttons: transButtons };
-        } else if (currentMsg.type === "list") {
-          // List translation logic yahan aayega...
+        }
+        // --- 4. CTA URL HANDLING ---
+        else if (currentMsg.type === "cta_url") {
+          payload.interactive.type = "cta_url";
+          payload.interactive.action = {
+            name: "cta_url",
+            parameters: { display_text: currentMsg.button_text, url: currentMsg.url }
+          };
         }
 
         await axios.post(`https://graph.facebook.com/v18.0/${REAL_PHONE_ID}/messages`, payload, {
@@ -91,8 +107,8 @@ export default async function handler(req, res) {
 
         return res.status(200).send('OK');
       } catch (error) {
-        console.error('❌ Translation/API Error:', error.message);
-        return res.status(200).send('OK'); // Error par bhi OK bhejien taaki Meta repeat na kare
+        console.error('❌ Crash Error:', error.response?.data || error.message);
+        return res.status(200).send('OK');
       }
     }
   }
