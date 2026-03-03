@@ -16,48 +16,47 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const REAL_PHONE_ID = "1027373887121315";
 
 export default async function handler(req, res) {
-
-  // --- 1. META WEBHOOK VERIFICATION (GET) ---
-  // Isse aapka "Verify and Save" wala error theek hoga
+  const jsonPath = path.join(process.cwd(), 'interactive-message.json');
+  
+  // --- 1. META WEBHOOK VERIFICATION (GET REQUEST) ---
   if (req.method === 'GET') {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
-    // Dashboard mein wahi token bharein jo yahan hai
     if (mode === 'subscribe' && token === 'Ayush@7859032663') {
-      console.log('✅ Webhook Verified!');
-      return res.status(200).send(challenge);
+      console.log('✅ Webhook Verified Successfully!');
+      return res.status(200).send(challenge); 
     } else {
       return res.status(403).send('Forbidden');
     }
   }
 
-  // --- 2. MESSAGE HANDLING LOGIC (POST) ---
-  // Aapka sara purana logic yahan hai, kuch bhi delete nahi kiya gaya
+  // --- 2. MESSAGE HANDLING (POST REQUEST) ---
   if (req.method === 'POST') {
-    const jsonPath = path.join(process.cwd(), 'interactive-message.json');
-    let messagesDB;
-    
-    try {
-      messagesDB = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-    } catch (e) {
-      console.error("JSON Error:", e.message);
-      return res.status(200).send('OK');
-    }
-
     const value = req.body.entry?.[0]?.changes?.[0]?.value;
+
     if (value && value.messages) {
       const msg = value.messages[0];
       const from = msg.from;
       const userName = value.contacts?.[0]?.profile?.name || "User";
+      
+      // DYNAMIC ID: Jis number par message aaya hai, wahi ID nikaal rahe hain
+      const incoming_phone_id = value.metadata.phone_number_id; 
 
       const userRef = doc(db, "users", from);
       const userSnap = await getDoc(userRef);
       let userLang = userSnap.exists() ? userSnap.data().lang : null;
+
+      let messagesDB;
+      try {
+        messagesDB = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      } catch (e) {
+        console.error("JSON Error:", e.message);
+        return res.status(200).send('OK');
+      }
 
       let targetKey = "welcome";
 
@@ -80,6 +79,7 @@ export default async function handler(req, res) {
       const finalLang = userLang || "hi";
 
       try {
+        // --- DEEP TRANSLATION LOGIC ---
         const transBody = await translate(rawBody, { to: finalLang });
         
         let payload = {
@@ -96,7 +96,6 @@ export default async function handler(req, res) {
             const tDesc = await translate(row.description || "", { to: finalLang });
             return { id: row.id, title: tTitle.text, description: tDesc.text };
           }));
-          
           const tBtnLabel = await translate("Options", { to: finalLang });
           payload.interactive.type = "list";
           payload.interactive.action = {
@@ -121,13 +120,14 @@ export default async function handler(req, res) {
           };
         }
 
-        await axios.post(`https://graph.facebook.com/v18.0/${REAL_PHONE_ID}/messages`, payload, {
+        // Using dynamic incoming_phone_id for the reply
+        await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, payload, {
           headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
         });
 
         return res.status(200).send('OK');
       } catch (error) {
-        console.error('❌ API Error:', error.message);
+        console.error('❌ Error Processing Message:', error.message);
         return res.status(200).send('OK');
       }
     }
