@@ -19,26 +19,25 @@ const db = getFirestore(app);
 const REAL_PHONE_ID = "1027373887121315";
 
 export default async function handler(req, res) {
-  
-  // --- 1. WEBHOOK VERIFICATION (GET REQUEST) ---
-  // Ye hissa Meta ki verification error ko theek karega
+
+  // --- 1. META WEBHOOK VERIFICATION (GET) ---
+  // Isse aapka "Verify and Save" wala error theek hoga
   if (req.method === 'GET') {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
-    // Aapke screenshot wala token: Ayush@7859032663
+    // Dashboard mein wahi token bharein jo yahan hai
     if (mode === 'subscribe' && token === 'Ayush@7859032663') {
-      console.log('✅ Webhook Verified Successfully!');
-      return res.status(200).send(challenge); 
+      console.log('✅ Webhook Verified!');
+      return res.status(200).send(challenge);
     } else {
-      console.log('❌ Verification Failed: Token Mismatch');
       return res.status(403).send('Forbidden');
     }
   }
 
-  // --- 2. MESSAGE HANDLING (POST REQUEST) ---
-  // Aapki puraani saari logic yahan se shuru hoti hai
+  // --- 2. MESSAGE HANDLING LOGIC (POST) ---
+  // Aapka sara purana logic yahan hai, kuch bhi delete nahi kiya gaya
   if (req.method === 'POST') {
     const jsonPath = path.join(process.cwd(), 'interactive-message.json');
     let messagesDB;
@@ -46,7 +45,7 @@ export default async function handler(req, res) {
     try {
       messagesDB = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
     } catch (e) {
-      console.error("JSON Read Error:", e.message);
+      console.error("JSON Error:", e.message);
       return res.status(200).send('OK');
     }
 
@@ -81,7 +80,6 @@ export default async function handler(req, res) {
       const finalLang = userLang || "hi";
 
       try {
-        // --- DEEP TRANSLATION LOGIC ---
         const transBody = await translate(rawBody, { to: finalLang });
         
         let payload = {
@@ -129,12 +127,11 @@ export default async function handler(req, res) {
 
         return res.status(200).send('OK');
       } catch (error) {
-        console.error('❌ Translation/Sending Error:', error.message);
+        console.error('❌ API Error:', error.message);
         return res.status(200).send('OK');
       }
     }
   }
 
-  // Meta ko hamesha 200 response chahiye hota hai
   return res.status(200).send('OK');
 }
