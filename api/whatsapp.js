@@ -1,4 +1,4 @@
-import axios from 'axios';
+Import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { initializeApp } from "firebase/app";
@@ -16,40 +16,13 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const REAL_PHONE_ID = "1027373887121315";
+const REAL_PHONE_ID = "1027373887121315"; //
 
 export default async function handler(req, res) {
-  
-  // --- 1. WEBHOOK VERIFICATION (GET REQUEST) ---
-  // Ye hissa Meta ki verification error ko theek karega
-  if (req.method === 'GET') {
-    const mode = req.query['hub.mode'];
-    const token = req.query['hub.verify_token'];
-    const challenge = req.query['hub.challenge'];
+  const jsonPath = path.join(process.cwd(), 'interactive-message.json');
+  const messagesDB = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
 
-    // Aapke screenshot wala token: Ayush@7859032663
-    if (mode === 'subscribe' && token === 'Ayush@7859032663') {
-      console.log('✅ Webhook Verified Successfully!');
-      return res.status(200).send(challenge); 
-    } else {
-      console.log('❌ Verification Failed: Token Mismatch');
-      return res.status(403).send('Forbidden');
-    }
-  }
-
-  // --- 2. MESSAGE HANDLING (POST REQUEST) ---
-  // Aapki puraani saari logic yahan se shuru hoti hai
   if (req.method === 'POST') {
-    const jsonPath = path.join(process.cwd(), 'interactive-message.json');
-    let messagesDB;
-    
-    try {
-      messagesDB = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-    } catch (e) {
-      console.error("JSON Read Error:", e.message);
-      return res.status(200).send('OK');
-    }
-
     const value = req.body.entry?.[0]?.changes?.[0]?.value;
     if (value && value.messages) {
       const msg = value.messages[0];
@@ -62,14 +35,14 @@ export default async function handler(req, res) {
 
       let targetKey = "welcome";
 
-      // --- LANGUAGE SETTING LOGIC ---
+      // --- 1. LANGUAGE SETTING LOGIC ---
       if (msg.type === 'interactive') {
         const replyId = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id;
-        if (replyId && replyId.startsWith("lang_") && !["lang_1", "lang_2", "lang_3"].includes(replyId)) {
+        if (replyId.startsWith("lang_") && !["lang_1", "lang_2", "lang_3"].includes(replyId)) {
           userLang = replyId.split("_")[1];
           await setDoc(userRef, { lang: userLang, name: userName }, { merge: true });
           targetKey = "welcome"; 
-        } else if (replyId) {
+        } else {
           targetKey = replyId;
         }
       }
@@ -81,7 +54,8 @@ export default async function handler(req, res) {
       const finalLang = userLang || "hi";
 
       try {
-        // --- DEEP TRANSLATION LOGIC ---
+        // --- 2. DEEP TRANSLATION LOGIC (Body + Interactive Elements) ---
+        // Deep Words ke liye hum translator ko standard target bhasha dete hain
         const transBody = await translate(rawBody, { to: finalLang });
         
         let payload = {
@@ -91,9 +65,10 @@ export default async function handler(req, res) {
           interactive: { body: { text: transBody.text } }
         };
 
+        // A. LIST TRANSLATION (All rows & descriptions)
         if (currentMsg.type === "list") {
           const transRows = await Promise.all(currentMsg.rows.map(async (row) => {
-            if (targetKey.startsWith("lang_")) return row; 
+            if (targetKey.startsWith("lang_")) return row; // Lang list ko mat badlo
             const tTitle = await translate(row.title, { to: finalLang });
             const tDesc = await translate(row.description || "", { to: finalLang });
             return { id: row.id, title: tTitle.text, description: tDesc.text };
@@ -106,6 +81,7 @@ export default async function handler(req, res) {
             sections: [{ title: "Menu", rows: transRows }]
           };
         } 
+        // B. BUTTON TRANSLATION (All button titles)
         else if (currentMsg.type === "reply" || currentMsg.buttons) {
           const transButtons = await Promise.all(currentMsg.buttons.map(async (b) => {
             const t = await translate(b.title, { to: finalLang });
@@ -114,6 +90,7 @@ export default async function handler(req, res) {
           payload.interactive.type = "button";
           payload.interactive.action = { buttons: transButtons };
         }
+        // C. CTA URL TRANSLATION
         else if (currentMsg.type === "cta_url") {
           const tBtnText = await translate(currentMsg.button_text, { to: finalLang });
           payload.interactive.type = "cta_url";
@@ -129,12 +106,12 @@ export default async function handler(req, res) {
 
         return res.status(200).send('OK');
       } catch (error) {
-        console.error('❌ Translation/Sending Error:', error.message);
+        console.error('❌ Error:', error.message);
         return res.status(200).send('OK');
       }
     }
   }
-
-  // Meta ko hamesha 200 response chahiye hota hai
   return res.status(200).send('OK');
 }
+
+
