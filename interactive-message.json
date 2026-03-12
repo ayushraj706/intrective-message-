@@ -1,183 +1,99 @@
 {
-  "lang_1": {
-    "type": "list",
-    "body": "नमस्ते {{name}}, कृपया अपनी अभीष्ट भाषा का चयन करें (१-१०):",
-    "rows": [
-      { "id": "lang_hi", "title": "हिन्दी", "description": "देवनागरी लिपि" },
-      { "id": "lang_en", "title": "English", "description": "English" },
-      { "id": "lang_bn", "title": "Bengali", "description": "বাংলা" },
-      { "id": "lang_mr", "title": "Marathi", "description": "मराठी" },
-      { "id": "lang_te", "title": "Telugu", "description": "తెలుగు" },
-      { "id": "lang_ta", "title": "Tamil", "description": "தமிழ்" },
-      { "id": "lang_gu", "title": "Gujarati", "description": "ગુજરાતી" },
-      { "id": "lang_ur", "title": "Urdu", "description": "اردو" },
-      { "id": "lang_kn", "title": "Kannada", "description": "ಕನ್ನಡ" },
-      { "id": "lang_2", "title": "आगामी भाषाएँ ➡️", "description": "अन्य विकल्प देखें" }
-    ]
-  },
-  "lang_2": {
-    "type": "list",
-    "body": "अपनी वांछित भाषा का चयन करें (११-२०):",
-    "rows": [
-      { "id": "lang_or", "title": "Odia", "description": "ଓଡ଼ିଆ" },
-      { "id": "lang_ml", "title": "Malayalam", "description": "മലയാളം" },
-      { "id": "lang_pa", "title": "Punjabi", "description": "ਪੰਜਾਬੀ" },
-      { "id": "lang_as", "title": "Assamese", "description": "অসমীয়া" },
-      { "id": "lang_mai", "title": "मैथिली", "description": "मैथिली" },
-      { "id": "lang_sat", "title": "Santali", "description": "संथाली" },
-      { "id": "lang_ks", "title": "Kashmiri", "description": "کأشُر" },
-      { "id": "lang_ne", "title": "Nepali", "description": "नेपाली" },
-      { "id": "lang_kok", "title": "Konkani", "description": "कोंकणी" },
-      { "id": "lang_3", "title": "आगामी भाषाएँ ➡️", "description": "अंतिम विकल्प" }
-    ]
-  },
-  "lang_3": {
-    "type": "list",
-    "body": "अपनी अभीष्ट भाषा का चयन करें (२१-३०):",
-    "rows": [
-      { "id": "lang_sa", "title": "संस्कृतम्", "description": "देववाणी" },
-      { "id": "lang_sd", "title": "Sindhi", "description": "سنڌي" },
-      { "id": "lang_doi", "title": "Dogri", "description": "डोगरी" },
-      { "id": "lang_mni", "title": "Manipuri", "description": "মৈতৈলোন" },
-      { "id": "lang_brx", "title": "Bodo", "description": "बड़ो" },
-      { "id": "lang_ar", "title": "Arabic", "description": "العربية" },
-      { "id": "lang_fr", "title": "French", "description": "Français" },
-      { "id": "lang_es", "title": "Spanish", "description": "Español" },
-      { "id": "lang_de", "title": "German", "description": "Deutsch" },
-      { "id": "lang_1", "title": "⬅️ पुनः प्रारंभ", "description": "प्रथम १० भाषाएँ" }
-    ]
-  },
   "welcome": {
     "type": "list",
-    "body": "नमस्ते _*{{name}}*_, बेसकी (BaseKey) एवं सुपरकी (SuperKey) के आधिकारिक वैधानिक पटल पर आपका हार्दिक अभिनंदन है। मैं आपकी किस प्रकार सहायता करने हेतु तत्पर हो सकता हूँ?",
+    "body": "Hi there! 👋\n\nYou're about to answer a Quiz about Digital Marketing. It is composed of only 4 questions. \n\n*Ready?*",
     "rows": [
-      { "id": "basekey_hub", "title": "बेसकी प्रणाली", "description": "व्हाट्सएप स्वचालन समाधान" },
-      { "id": "superkey_hub", "title": "सुपरकी प्रतिष्ठान", "description": "निविदा एवं सूचना प्रौद्योगिकी" },
-      { "id": "tools_hub", "title": "विशिष्ट उपकरण", "description": "लॉकरकी एवं अन्य" },
-      { "id": "contact_us", "title": "संपर्क सूत्र", "description": "सहायता हेतु संवाद" }
+      { "id": "q1_seo", "title": "Go!", "description": "Start the Quiz" }
     ]
   },
-  "contact_us": {
-    "type": "reply",
-    "body": "प्रत्यक्ष संवाद स्थापित करने हेतु अधोलिखित दूरभाष संख्या का उपयोग करें:\n\n📞 +919229966001\n\nआपकी जिज्ञासाओं का निवारण हमारा परम उद्देश्य है।",
-    "buttons": [
-      { "id": "main_menu", "title": "मुख्य मेनू" }
-    ]
-  },
-  "basekey_hub": {
-    "type": "reply",
-    "body": "बेसकी एक अत्याधुनिक व्हाट्सएप बिजनेस एपीआई व्यवस्था है जो प्रतिष्ठानों को डिजिटल सशक्तिकरण एवं सुव्यवस्थित स्वचालन की अद्वितीय शक्ति प्रदान करती है।",
-    "buttons": [
-      { "id": "bk_features", "title": "विशिष्टताएँ" },
-      { "id": "bk_pricing", "title": "मूल्य निर्धारण" },
-      { "id": "bk_web", "title": "बेसकी पटल" }
-    ]
-  },
-  "bk_features": {
-    "type": "reply",
-    "body": "बेसकी की प्रमुख विशिष्टताएँ:\n१. साझा दल इनबॉक्स\n२. संवादात्मक बटन एवं सूचियाँ\n३. स्वचालित चैटबॉट प्रवाह\n४. वास्तविक समय विश्लेषण।",
-    "buttons": [
-      { "id": "bk_pricing", "title": "मूल्य निर्धारण" },
-      { "id": "main_menu", "title": "मुख्य मेनू" }
-    ]
-  },
-  "bk_pricing": {
-    "type": "reply",
-    "body": "मूल्य निर्धारण योजनाएँ:\n- स्टार्टअप: निःशुल्क (परीक्षण)\n- प्रोफेशनल: ₹९९९/माह\n- एंटरप्राइज: उच्च मात्रा हेतु अनुकूलित समाधान।",
-    "buttons": [
-      { "id": "contact_sales", "title": "विक्रय प्रतिनिधि" },
-      { "id": "main_menu", "title": "मुख्य मेनू" }
-    ]
-  },
-  "bk_web": {
-    "type": "cta_url",
-    "body": "बेसकी के आधिकारिक वेब पटल एवं प्रलेखन के अवलोकन हेतु अधोलिखित बटन पर क्लिक करें।",
-    "button_text": "बेसकी खोलें",
-    "url": "https://ayus.fun"
-  },
-  "superkey_hub": {
-    "type": "reply",
-    "body": "सुपरकी समस्तीपुर, बिहार स्थित एक पंजीकृत तकनीकी संस्था है जो सरकारी निविदाओं (CPPP) एवं उन्नत वेब अनुप्रयोगों के निर्माण में विशेषज्ञता रखती है।",
-    "buttons": [
-      { "id": "sk_gov", "title": "सरकारी निविदा" },
-      { "id": "sk_dev", "title": "वेब विकास" },
-      { "id": "sk_udyam", "title": "पंजीकरण विवरण" }
-    ]
-  },
-  "sk_gov": {
-    "type": "reply",
-    "body": "सुपरकी केंद्रीय सार्वजनिक खरीद पोर्टल (CPPP) पर पंजीकृत है और हम राजकीय निविदाओं के प्रति उत्तरदायी बोली लगाने हेतु अधिकृत हैं।",
-    "buttons": [
-      { "id": "sk_services", "title": "सेवाओं की सूची" },
-      { "id": "main_menu", "title": "मुख्य मेनू" }
-    ]
-  },
-  "sk_udyam": {
-    "type": "reply",
-    "body": "सुपरकी सूक्ष्म, लघु एवं मध्यम उद्यम (MSME) के अंतर्गत पंजीकृत है। यह संस्था डिजिटल सशक्तिकरण के प्रति पूर्णतः समर्पित है।",
-    "buttons": [
-      { "id": "main_menu", "title": "मुख्य मेनू" }
-    ]
-  },
-  "sk_dev": {
-    "type": "reply",
-    "body": "हम अनुकूलित वेब अनुप्रयोग, एपीआई एकीकरण एवं क्लाउड होस्टिंग के क्षेत्र में विशिष्ट समाधान प्रदान करते हैं।",
-    "buttons": [
-      { "id": "sk_portfolio", "title": "पोर्टफोलियो" },
-      { "id": "main_menu", "title": "मुख्य मेनू" }
-    ]
-  },
-  "sk_portfolio": {
-    "type": "cta_url",
-    "body": "हमारे विगत उपक्रमों एवं शैक्षणिक वेबसाइट के उदाहरणों के अवलोकन हेतु यहाँ क्लिक करें।",
-    "button_text": "पोर्टफोलियो खोलें",
-    "url": "https://ayus.fun"
-  },
-  "tools_hub": {
-    "type": "reply",
-    "body": "आयुष राज द्वारा विकसित विशिष्ट उपकरणों एवं अनुप्रयोगों की सूची यहाँ उपलब्ध है।",
-    "buttons": [
-      { "id": "tool_lockerkey", "title": "लॉकरकी" },
-      { "id": "tool_animation", "title": "३डी एनीमेशन" },
-      { "id": "tool_crawler", "title": "वेब क्रॉलर" }
-    ]
-  },
-  "tool_lockerkey": {
-    "type": "reply",
-    "body": "लॉकरकी एक अत्यंत सुरक्षित पासवर्ड प्रबंधक अनुप्रयोग है जो आपके संवेदनशील डेटा को पूर्णतः एन्क्रिप्ट कर सुरक्षित रखता है।",
-    "buttons": [
-      { "id": "lk_web", "title": "लॉकरकी वेब" },
-      { "id": "main_menu", "title": "मुख्य मेनू" }
-    ]
-  },
-  "lk_web": {
-    "type": "cta_url",
-    "body": "लॉकरकी डैशबोर्ड के अधिगम हेतु अधोलिखित लिंक का चयन करें।",
-    "button_text": "लॉकरकी एक्सेस",
-    "url": "https://ayus.fun"
-  },
-  "tool_animation": {
-    "type": "reply",
-    "body": "हम यथार्थवादी ३डी चरित्र एनीमेशन (Realistic Style) निर्मित करते हैं जो खेलों एवं अनुप्रयोगों हेतु सर्वोत्तम हैं।",
-    "buttons": [
-      { "id": "main_menu", "title": "मुख्य मेनू" }
-    ]
-  },
-  "contact_sales": {
-    "type": "reply",
-    "body": "आप हमसे +91 9229966001 पर दूरभाष द्वारा संपर्क कर सकते हैं अथवा care@ayus.fun पर ईमेल प्रेषित कर सकते हैं।",
-    "buttons": [
-      { "id": "main_menu", "title": "मुख्य मेनू" }
-    ]
-  },
-  "main_menu": {
+  "q1_seo": {
     "type": "list",
-    "body": "मुख्य मेनू में आपका पुनः स्वागत है {{name}}। आगामी कार्यवाही हेतु कृपया वांछित विकल्प का चयन करें।",
+    "body": "Question 1: \n*What does SEO stand for?*",
     "rows": [
-      { "id": "basekey_hub", "title": "बेसकी" },
-      { "id": "superkey_hub", "title": "सुपरकी" },
-      { "id": "tools_hub", "title": "विशिष्ट उपकरण" },
-      { "id": "contact_us", "title": "संपर्क" }
+      { "id": "q1_correct", "title": "Search Engine Optimization", "description": "Option A" },
+      { "id": "q1_wrong", "title": "Send Email Out", "description": "Option B" },
+      { "id": "q1_wrong", "title": "Serial Editorial Output", "description": "Option C" },
+      { "id": "q1_wrong", "title": "Search Expectation Order", "description": "Option D" }
+    ]
+  },
+  "q1_correct": {
+    "type": "reply",
+    "body": "✅ *Well done!*\n\nMoving to the next question...",
+    "buttons": [
+      { "id": "q2_anchor", "title": "Next Question" }
+    ]
+  },
+  "q1_wrong": {
+    "type": "reply",
+    "body": "❌ *WRONG!*\n\nSEO stands for Search Engine Optimization.",
+    "buttons": [
+      { "id": "q2_anchor", "title": "Next Question" }
+    ]
+  },
+  "q2_anchor": {
+    "type": "list",
+    "body": "Question 2: \n*What is anchor text?*",
+    "rows": [
+      { "id": "q2_correct", "title": "The visible text hyperlinked", "description": "Option A" },
+      { "id": "q2_wrong", "title": "Text in top left", "description": "Option B" },
+      { "id": "q2_wrong", "title": "Most prominent text", "description": "Option C" },
+      { "id": "q2_wrong", "title": "A slogan", "description": "Option D" }
+    ]
+  },
+  "q2_correct": {
+    "type": "reply",
+    "body": "✅ *Well done!*\n\nGreat job, let's keep going.",
+    "buttons": [
+      { "id": "q3_persona", "title": "Next Question" }
+    ]
+  },
+  "q2_wrong": {
+    "type": "reply",
+    "body": "❌ *WRONG!*\n\nAnchor text is the visible text that is hyperlinked to another page.",
+    "buttons": [
+      { "id": "q3_persona", "title": "Next Question" }
+    ]
+  },
+  "q3_persona": {
+    "type": "list",
+    "body": "Question 3: \n*What is a persona?*",
+    "rows": [
+      { "id": "q3_correct", "title": "Fictional representation", "description": "A group of customers" },
+      { "id": "q3_wrong", "title": "Your target audience", "description": "Option B" },
+      { "id": "q3_wrong", "title": "Someone on mailing list", "description": "Option C" },
+      { "id": "q3_wrong", "title": "A repeat customer", "description": "Option D" }
+    ]
+  },
+  "q3_correct": {
+    "type": "reply",
+    "body": "✅ *Well done!*\n\nAlmost there!",
+    "buttons": [
+      { "id": "q4_cta", "title": "Last Question" }
+    ]
+  },
+  "q3_wrong": {
+    "type": "reply",
+    "body": "❌ *WRONG!*\n\nA persona is a fictional representation of a group of customers.",
+    "buttons": [
+      { "id": "q4_cta", "title": "Last Question" }
+    ]
+  },
+  "q4_cta": {
+    "type": "list",
+    "body": "Question 4: \n*What does CTA stand for?*",
+    "rows": [
+      { "id": "q4_correct", "title": "Call To Action", "description": "Option A" },
+      { "id": "q4_wrong", "title": "Consequence To Advert", "description": "Option B" },
+      { "id": "q4_wrong", "title": "Computer Tracked Actions", "description": "Option C" },
+      { "id": "q4_wrong", "title": "Characteristic Tracking", "description": "Option D" }
+    ]
+  },
+  "result": {
+    "type": "list",
+    "body": "Quiz Completed! 🎉\n\nYour session has ended. Would you like to try again?",
+    "rows": [
+      { "id": "welcome", "title": "Yes, Restart!", "description": "Start over" },
+      { "id": "exit", "title": "No, Bye!", "description": "Close quiz" }
     ]
   }
 }
