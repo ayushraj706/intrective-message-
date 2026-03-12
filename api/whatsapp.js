@@ -2,7 +2,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import translate from 'google-translate-api-x';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
@@ -21,7 +21,7 @@ const db = getFirestore(app);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const aiModel = genAI.getGenerativeModel({ 
   model: "gemini-1.5-flash",
-  systemInstruction: "You are an assistant for Ayush Raj's platforms: BaseKey (WhatsApp Business API) and SuperKey (IT & Govt Tenders). Also help with Sanskrit grammar using Panini's Ashtadhyayi rules. Keep responses concise." 
+  systemInstruction: "You are an assistant for Ayush Raj's platforms: BaseKey (WhatsApp Business Platform), SuperKey (IT & Govt Tenders), and LockerKey (Password Manager). You also know Sanskrit grammar based on Panini's Ashtadhyayi. Keep responses concise, helpful, and friendly." 
 });
 
 export default async function handler(req, res) {
@@ -51,7 +51,31 @@ export default async function handler(req, res) {
       let messagesDB = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
       let targetKey = null;
 
-      // 1. Handle Interactive Buttons First
+      // --- 1. PRIORITY: CHECK IF USER IS IN AI MODE (FOR TEXT MESSAGES) ---
+      if (msg.type === "text" && userStatus === "chatting_with_ai") {
+        try {
+          // Gemini Call
+          const result = await aiModel.generateContent(msg.text.body);
+          const aiText = result.response.text();
+          
+          // Translate AI Response
+          const transAi = await translate(aiText, { to: userLang });
+
+          await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, {
+            messaging_product: "whatsapp",
+            to: from,
+            type: "text",
+            text: { body: transAi.text }
+          }, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } });
+
+          return res.status(200).send('OK'); // STOP HERE
+        } catch (e) {
+          console.error("Gemini Error:", e.message);
+          return res.status(200).send('OK');
+        }
+      }
+
+      // --- 2. HANDLE INTERACTIVE BUTTONS ---
       if (msg.type === 'interactive') {
         const replyId = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id;
         
@@ -67,32 +91,12 @@ export default async function handler(req, res) {
           targetKey = "welcome";
         } else {
           targetKey = replyId;
+          // Kisi bhi aur button par AI band karein
           await setDoc(userRef, { status: "normal" }, { merge: true });
         }
       }
 
-      // 2. AI MODE LOGIC (Must RETURN to stop menu from sending)
-      if (userStatus === "chatting_with_ai" && msg.type === "text" && !targetKey) {
-        try {
-          const result = await aiModel.generateContent(msg.text.body);
-          const aiText = result.response.text();
-          const transAi = await translate(aiText, { to: userLang });
-
-          await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, {
-            messaging_product: "whatsapp",
-            to: from,
-            type: "text",
-            text: { body: transAi.text }
-          }, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } });
-
-          return res.status(200).send('OK'); // Yahan function khatam
-        } catch (e) {
-          console.error("AI Error:", e.message);
-          return res.status(200).send('OK');
-        }
-      }
-
-      // 3. MENU FALLBACK (Only runs if not in AI mode or if button was clicked)
+      // --- 3. MENU FALLBACK (ONLY IF NOT HANDLED BY AI) ---
       if (!targetKey) {
         targetKey = userData.lang ? "welcome" : "lang_1";
       }
@@ -110,7 +114,7 @@ export default async function handler(req, res) {
         if (currentMsg.type === "list") {
           const transRows = await Promise.all(currentMsg.rows.map(async (row) => {
             const tTitle = await translate(row.title, { to: userLang });
-            return { id: row.id, title: tTitle.text, description: row.description };
+            return { id: row.id, title: tTitle.text, description: row.description || "" };
           }));
           payload.interactive.type = "list";
           payload.interactive.action = { button: "Options", sections: [{ title: "Menu", rows: transRows }] };
@@ -127,7 +131,7 @@ export default async function handler(req, res) {
           headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
         });
       } catch (error) {
-        console.error("Payload Error:", error.message);
+        console.error("Menu Error:", error.message);
       }
     }
   }
