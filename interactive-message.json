@@ -22,7 +22,7 @@
       { "id": "lang_or", "title": "Odia", "description": "ଓଡ଼ିଆ" },
       { "id": "lang_ml", "title": "Malayalam", "description": "മലയാളം" },
       { "id": "lang_pa", "title": "Punjabi", "description": "ਪੰਜਾਬੀ" },
-      { "id": "lang_as", "title": "Assamese", "description": "অসমীয়া" },
+      { "id": "lang_as", "title": "Assamese", "description": "অসমୀয়া" },
       { "id": "lang_mai", "title": "मैथिली", "description": "मैथिली" },
       { "id": "lang_sat", "title": "Santali", "description": "संथाली" },
       { "id": "lang_ks", "title": "Kashmiri", "description": "کأشُر" },
@@ -53,13 +53,21 @@
     "rows": [
       { "id": "basekey_hub", "title": "बेसकी प्रणाली", "description": "व्हाट्सएप स्वचालन समाधान" },
       { "id": "superkey_hub", "title": "सुपरकी प्रतिष्ठान", "description": "निविदा एवं सूचना प्रौद्योगिकी" },
-      { "id": "tools_hub", "title": "विशिष्ट उपकरण", "description": "लॉकरकी एवं अन्य" },
+      { "id": "tools_hub", "title": "विशिष्ट उपकरण", "description": "लॉkerकी एवं अन्य" },
+      { "id": "gemini_helper", "title": "Gemini AI", "description": "AI से तकनीकी सहायता लें" },
       { "id": "contact_us", "title": "संपर्क सूत्र", "description": "सहायता हेतु संवाद" }
     ]
   },
   "contact_us": {
     "type": "reply",
     "body": "प्रत्यक्ष संवाद स्थापित करने हेतु अधोलिखित दूरभाष संख्या का उपयोग करें:\n\n📞 +919229966001\n\nआपकी जिज्ञासाओं का निवारण हमारा परम उद्देश्य है।",
+    "buttons": [
+      { "id": "main_menu", "title": "मुख्य मेनू" }
+    ]
+  },
+  "gemini_helper": {
+    "type": "reply",
+    "body": "नमस्ते! मैं *Gemini AI* हूँ।\n\nमैं बेसकी (BaseKey), सुपरकी (SuperKey) और तकनीकी समस्याओं को हल करने में आपकी मदद कर सकता हूँ।\n\n*कृपया अपना प्रश्न यहाँ टाइप करें:*",
     "buttons": [
       { "id": "main_menu", "title": "मुख्य मेनू" }
     ]
@@ -177,6 +185,7 @@
       { "id": "basekey_hub", "title": "बेसकी" },
       { "id": "superkey_hub", "title": "सुपरकी" },
       { "id": "tools_hub", "title": "विशिष्ट उपकरण" },
+      { "id": "gemini_helper", "title": "Gemini AI" },
       { "id": "contact_us", "title": "संपर्क" }
     ]
   }
