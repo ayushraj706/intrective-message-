@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const value = req.body.entry?.[0]?.changes?.[0]?.value;
     
-    // 1. FLOODING CONTROL: व्हाट्सएप को तुरंत जवाब देना
+    // 1. Webhook को तुरंत जवाब देना ताकि Flooding न हो
     res.status(200).send('OK');
 
     if (value && value.messages) {
@@ -48,70 +48,74 @@ export default async function handler(req, res) {
       let userStatus = userData.status || "normal";
       let targetKey = null;
 
-      // 2. AI MODE (Gemini-1.5-Flash: Text/Media Analysis)
-      if (userStatus === "chatting_with_ai" && (msg.type === "text" || msg.type === "image" || msg.type === "document")) {
+      // --- 2. MULTIMODAL GEMINI FEATURE (Reading Photos/PDF) ---
+      // Build multimodal RAG with new Gemini Embedding.pdf]
+      if (userStatus === "chatting_with_ai" && (msg.type === "image" || msg.type === "document" || msg.type === "text")) {
         try {
           const aiModel = genAI.getGenerativeModel({ 
             model: "gemini-1.5-flash", 
-            systemInstruction: "You are a professional assistant for Ayush Raj's BaseKey and SuperKey. Provide clean, respectful, and concise answers." 
+            systemInstruction: "You are an assistant for Ayush Raj's platforms. Analyze text and media carefully." 
           });
 
-          let aiInput = [msg.text?.body || "फाइल का विश्लेषण करें।"];
+          let aiParts = [msg.text?.body || "Please analyze this file."];
+
+          [span_0](start_span)[span_1](start_span)// Media Processing[span_0](end_span)[span_1](end_span)
           if (msg.type === "image" || msg.type === "document") {
             const mediaId = msg.image?.id || msg.document?.id;
-            const mediaRes = await axios.get(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } });
-            const fileData = await axios.get(mediaRes.data.url, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }, responseType: 'arraybuffer' });
-            aiInput.push({ inlineData: { data: Buffer.from(fileData.data).toString("base64"), mimeType: msg.image?.mime_type || msg.document?.mime_type } });
+            const mimeType = msg.image?.mime_type || msg.document?.mime_type;
+            
+            // Meta से मीडिया डाउनलोड करना
+            const mediaRes = await axios.get(`https://graph.facebook.com/v18.0/${mediaId}`, {
+              headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
+            });
+            const fileData = await axios.get(mediaRes.data.url, {
+              headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` },
+              responseType: 'arraybuffer'
+            });
+
+            aiParts.push({
+              inlineData: { data: Buffer.from(fileData.data).toString("base64"), mimeType }
+            });
           }
 
-          const result = await aiModel.generateContent(aiInput);
+          const result = await aiModel.generateContent(aiParts);
           const transAi = await translate(result.response.text(), { to: userLang });
 
           await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, {
             messaging_product: "whatsapp", to: from, type: "interactive",
-            interactive: { 
-              type: "button", 
-              body: { text: transAi.text.substring(0, 1024) }, 
-              action: { buttons: [{ type: "reply", reply: { id: "main_menu", title: "🏠 Main Menu" } }] } 
+            interactive: {
+              type: "button",
+              body: { text: transAi.text.substring(0, 1024) },
+              action: { buttons: [{ type: "reply", reply: { id: "main_menu", title: "🏠 Main Menu" } }] }
             }
           }, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } });
 
           await updateDoc(userRef, { lastInteraction: Timestamp.now() });
           return;
-        } catch (e) { return; }
+        } catch (e) { console.error("AI Error:", e.message); return; }
       }
 
-      // 3. INTERACTIVE MAPPING (Buttons & Lists)
+      // --- 3. INTERACTIVE HANDLING ---
       if (msg.type === 'interactive') {
         const replyId = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id;
-        
         if (replyId === "gemini_helper") {
           await setDoc(userRef, { status: "chatting_with_ai", lastInteraction: Timestamp.now() }, { merge: true });
           targetKey = "gemini_helper";
         } else if (replyId === "main_menu") {
           targetKey = "welcome";
           await updateDoc(userRef, { status: "normal" });
-        } else if (replyId.startsWith("lang_")) {
-          const lCode = replyId.split("_")[1];
-          if (!["1", "2", "3"].includes(lCode)) {
-            await updateDoc(userRef, { lang: lCode });
-            userLang = lCode;
-            targetKey = "welcome";
-          } else { targetKey = replyId; }
-        } else {
-          targetKey = replyId;
-        }
+        } else { targetKey = replyId; }
       } else if (msg.type === 'text') {
-        targetKey = "welcome"; 
+        targetKey = "welcome";
       }
 
-      // 4. RESPONSE BUILDER ENGINE (Fixing 400 Error)
+      // --- 4. RESPONSE BUILDER (FIXING 400 ERROR) ---
       if (targetKey) {
-        const dbJson = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+        let dbJson = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
         const currentMsg = dbJson[targetKey] || dbJson["welcome"];
-        
-        // Error Fix: 'reply' type ko 'button' में बदलना
-        const apiType = (currentMsg.type === "reply" || currentMsg.type === "button") ? "button" : currentMsg.type;
+
+        // ERROR FIX: 'reply' को 'button' में बदलना
+        const apiType = (currentMsg.type === "reply") ? "button" : currentMsg.type;
 
         const transBody = await translate(currentMsg.body.replace("{{name}}", userName), { to: userLang });
 
@@ -125,7 +129,6 @@ export default async function handler(req, res) {
           }
         };
 
-        // Action Builder Logic
         if (apiType === "cta_url") {
           payload.interactive.action = { name: "cta_url", parameters: { display_text: currentMsg.button_text, url: currentMsg.url } };
         } else if (apiType === "button") {
