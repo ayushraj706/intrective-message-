@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Save, Copy, CheckCircle2, Loader2, X, Globe, Shield, Smartphone, Key } from 'lucide-react';
+import { ArrowLeft, Save, Copy, CheckCircle2, Loader2, X, Globe, Shield, Smartphone, Key, ExternalLink } from 'lucide-react';
 import { db, auth } from '../../firebase'; 
 import { doc, setDoc, onSnapshot } from 'firebase/firestore'; 
 
@@ -7,6 +7,7 @@ const WhatsAppSetup = ({ onBack }) => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
+  const [copiedField, setCopiedField] = useState(''); // 'url' or 'token'
   const [errorMessage, setErrorMessage] = useState('');
   
   const [formData, setFormData] = useState({
@@ -33,7 +34,6 @@ const WhatsAppSetup = ({ onBack }) => {
     setVerifyToken(newToken);
 
     try {
-      // डेटाबेस में यूजर की कॉन्फ़िगरेशन सेव करना
       await setDoc(doc(db, "configs", userId), {
         ...formData,
         webhookVerifyToken: newToken,
@@ -43,14 +43,19 @@ const WhatsAppSetup = ({ onBack }) => {
       
       setShowModal(true);
       
-      // Real-time listener: Meta से वेरिफिकेशन चेक करने के लिए
-      onSnapshot(doc(db, "configs", userId), (doc) => {
+      const unsub = onSnapshot(doc(db, "configs", userId), (doc) => {
         if (doc.data()?.isVerified) setIsVerified(true);
       });
     } catch (err) {
       alert("Error: " + err.message);
     }
     setLoading(false);
+  };
+
+  const copyToClipboard = (text, field) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(''), 2000);
   };
 
   return (
@@ -63,7 +68,6 @@ const WhatsAppSetup = ({ onBack }) => {
         <h2 className="text-4xl font-extrabold mb-12 text-zinc-900 dark:text-white tracking-tighter">WhatsApp Business Setup</h2>
         
         <div className="bg-white dark:bg-[#1a1c1e] p-10 rounded-[2.5rem] border border-zinc-200 dark:border-gray-800 space-y-6 shadow-2xl">
-          
           {/* Inbox Name */}
           <div>
             <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-600 uppercase tracking-widest mb-3 px-1">Display Name (Inbox Name)</label>
@@ -71,7 +75,6 @@ const WhatsAppSetup = ({ onBack }) => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Phone Number ID */}
             <div>
               <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-600 uppercase tracking-widest mb-3 px-1">Phone Number ID</label>
               <div className="relative">
@@ -79,15 +82,12 @@ const WhatsAppSetup = ({ onBack }) => {
                 <input type="text" placeholder="1059..." className="w-full bg-zinc-100 dark:bg-[#111] border border-zinc-200 dark:border-gray-800 rounded-2xl pl-14 pr-6 py-4 text-zinc-900 dark:text-white focus:border-blue-500 outline-none" onChange={(e) => setFormData({...formData, phoneId: e.target.value})} />
               </div>
             </div>
-
-            {/* Business Account ID */}
             <div>
               <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-600 uppercase tracking-widest mb-3 px-1">WABA Account ID</label>
               <input type="text" placeholder="2948..." className="w-full bg-zinc-100 dark:bg-[#111] border border-zinc-200 dark:border-gray-800 rounded-2xl px-6 py-4 text-zinc-900 dark:text-white focus:border-blue-500 outline-none" onChange={(e) => setFormData({...formData, businessId: e.target.value})} />
             </div>
           </div>
 
-          {/* Access Token */}
           <div>
             <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-600 uppercase tracking-widest mb-3 px-1">Permanent Access Token</label>
             <div className="relative">
@@ -103,20 +103,69 @@ const WhatsAppSetup = ({ onBack }) => {
         </div>
       </div>
 
-      {/* --- POPUP MODAL (Same as before but with error handling) --- */}
+      {/* --- POPUP MODAL (The Fix is Here) --- */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6 animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6 animate-in fade-in zoom-in-95 duration-300">
           <div className="bg-white dark:bg-[#1a1c1e] w-full max-w-lg rounded-[2.5rem] border border-zinc-200 dark:border-gray-800 p-10 shadow-3xl relative">
-            {/* Modal Content here (as in previous code) */}
-            <h3 className="text-2xl font-bold mb-6">Verify Webhook</h3>
-            {/* ... Modal inputs for Webhook URL and Token ... */}
             
-            {errorMessage && <p className="text-red-500 text-xs font-bold mb-4 bg-red-500/10 p-3 rounded-xl">{errorMessage}</p>}
-            
-            <button onClick={() => isVerified ? onBack() : setErrorMessage("Meta Portal par verification abhi baaki hai bhai!")} 
-              className={`w-full py-5 rounded-2xl font-bold transition-all ${isVerified ? 'bg-green-600 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'}`}>
-              {isVerified ? 'Done' : 'Waiting for Verification...'}
+            <button onClick={() => setShowModal(false)} className="absolute top-8 right-8 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
+              <X size={24} />
             </button>
+
+            <h3 className="text-2xl font-bold mb-2 flex items-center gap-2 text-zinc-900 dark:text-white">
+              <Shield className="text-blue-500" size={24} /> Verify Webhook
+            </h3>
+            <p className="text-zinc-500 text-sm mb-8">Meta Developer Portal पर ये क्रेडेंशियल्स डालें।</p>
+            
+            <div className="space-y-6">
+              {/* Webhook URL Field */}
+              <div className="p-5 bg-zinc-50 dark:bg-black border border-zinc-100 dark:border-gray-800 rounded-2xl">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Callback URL</label>
+                  <button onClick={() => copyToClipboard(webhookUrl, 'url')} className="text-blue-500 hover:bg-blue-500/10 p-1 rounded-md transition-all">
+                    {copiedField === 'url' ? <CheckCircle2 size={16} className="text-green-500" /> : <Copy size={16} />}
+                  </button>
+                </div>
+                <code className="text-[11px] font-mono text-zinc-600 dark:text-gray-400 break-all leading-relaxed select-all">{webhookUrl}</code>
+              </div>
+
+              {/* Verify Token Field */}
+              <div className="p-5 bg-zinc-50 dark:bg-black border border-zinc-100 dark:border-gray-800 rounded-2xl">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Verify Token</label>
+                  <button onClick={() => copyToClipboard(verifyToken, 'token')} className="text-blue-500 hover:bg-blue-500/10 p-1 rounded-md transition-all">
+                    {copiedField === 'token' ? <CheckCircle2 size={16} className="text-green-500" /> : <Copy size={16} />}
+                  </button>
+                </div>
+                <code className="text-sm font-mono text-zinc-600 dark:text-gray-400 select-all">{verifyToken}</code>
+              </div>
+            </div>
+
+            {/* Verification Status */}
+            <div className="mt-8">
+              {isVerified ? (
+                <div className="flex items-center justify-center gap-3 text-green-500 font-bold bg-green-500/10 p-4 rounded-2xl border border-green-500/20 text-sm">
+                  <CheckCircle2 size={18} /> Meta Verified Successfully!
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-3 text-zinc-500 font-medium bg-zinc-100 dark:bg-zinc-800/50 p-4 rounded-2xl animate-pulse text-sm">
+                  <Loader2 className="animate-spin" size={16} /> Meta Verification का इंतज़ार है...
+                </div>
+              )}
+            </div>
+            
+            {errorMessage && <p className="mt-4 text-red-500 text-[10px] font-bold text-center uppercase tracking-widest">{errorMessage}</p>}
+            
+            <button 
+              onClick={() => isVerified ? onBack() : setErrorMessage("Pehle Meta Portal par verify karo bhai!")} 
+              className={`w-full mt-6 py-5 rounded-2xl font-bold transition-all shadow-lg ${isVerified ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-900/20' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 cursor-not-allowed'}`}
+            >
+              {isVerified ? 'Finish Setup' : 'Waiting for Meta...'}
+            </button>
+
+            <a href="https://developers.facebook.com/" target="_blank" className="flex items-center justify-center gap-1 mt-6 text-xs text-blue-500 hover:underline">
+              Open Meta Portal <ExternalLink size={12} />
+            </a>
           </div>
         </div>
       )}
