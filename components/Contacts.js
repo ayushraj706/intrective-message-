@@ -1,55 +1,70 @@
 import React, { useState } from 'react';
-import { Users, Search, Smartphone, FileText, Loader2, Plus, ArrowRight } from 'lucide-react';
+import { Users, Search, Smartphone, FileText, Loader2, Plus, ArrowRight, Trash2, RotateCcw } from 'lucide-react';
 
 const Contacts = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [extractedContacts, setExtractedContacts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // 1. फाइल अपलोड और स्मार्ट पार्सिंग
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     setIsUploading(true);
-
-    // फाइल पढ़ने के लिए 'FileReader' का इस्तेमाल
     const reader = new FileReader();
     
     reader.onload = (event) => {
       const text = event.target.result;
-      const rows = text.split('\n'); // लाइन दर लाइन तोड़ना
+      const rows = text.split('\n').map(row => row.split(','));
+      
+      if (rows.length < 2) {
+        alert("File खाली है!");
+        setIsUploading(false);
+        return;
+      }
+
+      // 'phone_number' कॉलम का पता लगाना
+      const headers = rows[0].map(h => h.trim().toLowerCase());
+      const phoneIndex = headers.findIndex(h => h.includes('phone') || h.includes('number'));
+
+      if (phoneIndex === -1) {
+        alert("CSV में 'phone_number' कॉलम नहीं मिला!");
+        setIsUploading(false);
+        return;
+      }
+
       const numbersFound = [];
-
-      // CSV की हर लाइन को चेक करना
-      rows.forEach((row, index) => {
-        if (index === 0) return; // पहली लाइन (Header) को छोड़ना
-        
-        const columns = row.split(','); // कोमा से अलग करना
-        // तुम्हारी फाइल में नंबर 2nd कॉलम में है (Index 1)
-        let phone = columns[1]; 
-
+      for (let i = 1; i < rows.length; i++) {
+        let phone = rows[i][phoneIndex];
         if (phone) {
-          // नंबर को साफ़ करना (Space हटाना, फालतू करैक्टर हटाना)
-          const cleanPhone = phone.replace(/["\s-]/g, '').trim();
+          let cleanPhone = phone.replace(/[^0-9]/g, '').trim();
           if (cleanPhone.length >= 10) {
-            numbersFound.push(cleanPhone);
+            numbersFound.push('+' + cleanPhone);
           }
         }
-      });
+      }
 
-      // डुप्लीकेट नंबर्स हटाना
       const uniqueNumbers = [...new Set(numbersFound)];
       setExtractedContacts(uniqueNumbers);
       setIsUploading(false);
-      alert(`बधाई हो! ${uniqueNumbers.length} नंबर्स लोड हो गए हैं। 🚀`);
+      alert(`${uniqueNumbers.length} नंबर्स लोड हो गए! ✅`);
     };
 
-    reader.onerror = () => {
-      alert("फाइल पढ़ने में दिक्कत आई!");
-      setIsUploading(false);
-    };
+    reader.readAsText(file);
+  };
 
-    reader.readAsText(file); // फाइल को टेक्स्ट के रूप में पढ़ना शुरू करें
+  // 2. सिंगल नंबर डिलीट करने का फंक्शन
+  const deleteContact = (numToDelete) => {
+    const updatedList = extractedContacts.filter(num => num !== numToDelete);
+    setExtractedContacts(updatedList);
+  };
+
+  // 3. पूरी लिस्ट साफ करने का फंक्शन
+  const clearAllContacts = () => {
+    if (window.confirm("क्या आप पूरी लिस्ट डिलीट करना चाहते हैं?")) {
+      setExtractedContacts([]);
+    }
   };
 
   const filteredContacts = extractedContacts.filter(num => num.includes(searchTerm));
@@ -62,19 +77,25 @@ const Contacts = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
           <div>
             <h1 className="text-5xl font-black tracking-tighter dark:text-white italic">BaseKey Contacts</h1>
-            <p className="text-zinc-500 text-sm mt-2 font-medium">Upload your CSV and get WhatsApp numbers instantly.</p>
+            <p className="text-zinc-500 text-sm mt-2 font-medium">Manage and cleanup your WhatsApp blast lists.</p>
           </div>
           
-          <label className="group flex items-center gap-3 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-bold cursor-pointer transition-all shadow-xl shadow-blue-600/20 active:scale-95">
-            {isUploading ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} className="group-hover:rotate-90 transition-transform" />}
-            <span>{isUploading ? 'Extracting...' : 'Upload CSV'}</span>
-            <input 
-              type="file" 
-              className="hidden" 
-              onChange={handleFileUpload} 
-              accept=".csv,.txt" 
-            />
-          </label>
+          <div className="flex items-center gap-3">
+            {extractedContacts.length > 0 && (
+              <button 
+                onClick={clearAllContacts}
+                className="p-4 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all shadow-sm"
+                title="Clear All"
+              >
+                <RotateCcw size={20} />
+              </button>
+            )}
+            <label className="group flex items-center gap-3 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-bold cursor-pointer transition-all shadow-xl shadow-blue-600/20 active:scale-95">
+              {isUploading ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} className="group-hover:rotate-90 transition-transform" />}
+              <span>{isUploading ? 'Scanning...' : 'Upload CSV'}</span>
+              <input type="file" className="hidden" onChange={handleFileUpload} accept=".csv" />
+            </label>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -83,47 +104,53 @@ const Contacts = () => {
             <div className="w-14 h-14 bg-blue-100 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center text-blue-600 mb-6">
               <Users size={28} />
             </div>
-            <p className="text-zinc-500 text-xs font-bold uppercase tracking-[0.2em]">Total Numbers</p>
+            <p className="text-zinc-500 text-xs font-bold uppercase tracking-[0.2em]">Ready to Message</p>
             <h3 className="text-5xl font-black dark:text-white mt-2">{extractedContacts.length}</h3>
-            <div className="mt-8 pt-8 border-t border-zinc-100 dark:border-zinc-800">
-              <p className="text-zinc-400 text-xs italic">
-                फाइल से निकाले गए नंबर्स की लिस्ट नीचे है।
-              </p>
-            </div>
           </div>
 
-          {/* Contacts List Card */}
+          {/* List Card */}
           <div className="lg:col-span-2 bg-white dark:bg-zinc-900/50 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
             <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/80 backdrop-blur-md flex flex-col md:flex-row items-center justify-between gap-4">
-              <h4 className="font-bold dark:text-white text-lg px-2">Contacts List</h4>
+              <h4 className="font-bold dark:text-white text-lg px-2">Recent List</h4>
               <div className="relative w-full md:w-64">
                 <Search className="absolute left-4 top-3 text-zinc-500" size={16} />
                 <input 
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Filter numbers..." 
+                  placeholder="Search numbers..." 
                   className="w-full bg-zinc-100 dark:bg-zinc-800/50 rounded-xl py-2.5 pl-11 pr-4 text-xs outline-none focus:ring-2 ring-blue-500/20 transition-all dark:text-white" 
                 />
               </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto max-h-[600px] divide-y divide-zinc-100 dark:divide-zinc-800">
+            <div className="flex-1 overflow-y-auto max-h-[600px] divide-y divide-zinc-100 dark:divide-zinc-800 custom-scrollbar">
               {filteredContacts.length > 0 ? filteredContacts.map((num, i) => (
                 <div key={i} className="group p-5 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-blue-600/5 transition-all">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-blue-500 transition-colors">
+                    <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-blue-500">
                       <Smartphone size={18} />
                     </div>
                     <span className="font-bold text-sm dark:text-zinc-200">{num}</span>
                   </div>
-                  <button className="flex items-center gap-2 text-blue-600 text-xs font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all hover:gap-3">
-                    Send Message <ArrowRight size={14} />
-                  </button>
+                  
+                  <div className="flex items-center gap-2">
+                    {/* DELETE BUTTON */}
+                    <button 
+                      onClick={() => deleteContact(num)}
+                      className="p-2 text-zinc-400 hover:text-red-500 transition-colors md:opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                    
+                    <button className="flex items-center gap-2 text-blue-600 text-xs font-black uppercase tracking-widest hover:gap-3 transition-all">
+                      Chat <ArrowRight size={14} />
+                    </button>
+                  </div>
                 </div>
               )) : (
                 <div className="flex-1 flex flex-col items-center justify-center p-20 opacity-30">
                   <FileText size={64} className="mb-4" />
-                  <p className="text-zinc-400 font-bold uppercase tracking-[0.3em] text-[10px]">No Contacts Uploaded</p>
+                  <p className="text-zinc-400 font-bold uppercase tracking-[0.3em] text-[10px]">No Contacts found</p>
                 </div>
               )}
             </div>
@@ -135,3 +162,4 @@ const Contacts = () => {
 };
 
 export default Contacts;
+                                                                  
