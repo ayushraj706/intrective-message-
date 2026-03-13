@@ -46,36 +46,35 @@ export default async function handler(req, res) {
       let currentTime = Date.now();
       let targetKey = null;
 
-      // 1. TIMEOUT LOGIC (5 Mins)
+      // --- 1. TIMEOUT LOGIC (5 Mins) ---
       if (userStatus === "chatting_with_ai" && (currentTime - lastTime) > 300000) {
         userStatus = "normal";
         await updateDoc(userRef, { status: "normal" });
       }
 
-      [span_0](start_span)[span_1](start_span)// 2. GEMINI AI MODE (Text + Photos + PDF)[span_0](end_span)[span_1](end_span)
+      // --- 2. AI MODE (Text/Files) ---
       if (userStatus === "chatting_with_ai" && (msg.type === "text" || msg.type === "image" || msg.type === "document")) {
         try {
-          const aiModel = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash", 
-            systemInstruction: "You are an assistant for Ayush Raj's BaseKey and SuperKey. Be concise and help with documents." 
-          });
+          const aiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+          let aiInput = [msg.text?.body || "Explain this file."];
 
-          let aiParts = [msg.text?.body || "Analyze this file."];
           if (msg.type === "image" || msg.type === "document") {
             const mediaId = msg.image?.id || msg.document?.id;
-            const mimeType = msg.image?.mime_type || msg.document?.mime_type;
             const mediaRes = await axios.get(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } });
             const fileData = await axios.get(mediaRes.data.url, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }, responseType: 'arraybuffer' });
-            aiParts.push({ inlineData: { data: Buffer.from(fileData.data).toString("base64"), mimeType } });
+            aiInput.push({ inlineData: { data: Buffer.from(fileData.data).toString("base64"), mimeType: msg.image?.mime_type || msg.document?.mime_type } });
           }
 
-          const result = await aiModel.generateContent(aiParts);
+          const result = await aiModel.generateContent(aiInput);
           const transAi = await translate(result.response.text(), { to: userLang });
-          let replyText = transAi.text.substring(0, 1000);
-
+          
           await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, {
             messaging_product: "whatsapp", to: from, type: "interactive",
-            interactive: { type: "button", body: { text: replyText }, action: { buttons: [{ type: "reply", reply: { id: "main_menu", title: "🏠 Main Menu" } }] } }
+            interactive: { 
+              type: "button", 
+              body: { text: transAi.text.substring(0, 1000) }, 
+              action: { buttons: [{ type: "reply", reply: { id: "main_menu", title: "🏠 Main Menu" } }] } 
+            }
           }, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } });
 
           await updateDoc(userRef, { lastInteraction: Timestamp.now() });
@@ -83,35 +82,43 @@ export default async function handler(req, res) {
         } catch (e) { return res.status(200).send('OK'); }
       }
 
-      // 3. INTERACTIVE MESSAGE HANDLING (IDs logic)
+      // --- 3. JSON BRIDGE LOGIC (Mapping Messages to JSON) ---
       if (msg.type === 'interactive') {
         const replyId = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id;
         
-        if (replyId.startsWith("lang_")) {
-          const lCode = replyId.split("_")[1];
-          if (!["1", "2", "3"].includes(lCode)) {
-            await updateDoc(userRef, { lang: lCode });
-            userLang = lCode; targetKey = "welcome";
-          } else { targetKey = replyId; }
-        } else if (replyId === "gemini_helper") {
+        if (replyId === "gemini_helper") {
           await setDoc(userRef, { status: "chatting_with_ai", lastInteraction: Timestamp.now() }, { merge: true });
           targetKey = "gemini_helper";
         } else if (replyId === "main_menu") {
-          targetKey = "welcome"; await updateDoc(userRef, { status: "normal", lastInteraction: Timestamp.now() });
+          targetKey = "welcome";
+          await updateDoc(userRef, { status: "normal" });
+        } else if (replyId.startsWith("lang_")) {
+          const lCode = replyId.split("_")[1];
+          if (!["1", "2", "3"].includes(lCode)) {
+            await updateDoc(userRef, { lang: lCode });
+            userLang = lCode;
+            targetKey = "welcome";
+          } else { targetKey = replyId; }
         } else {
-          targetKey = replyId; 
+          targetKey = replyId;
         }
+      } else if (msg.type === 'text') {
+        // Agar normal text hai aur user AI mode mein nahi hai toh hamesha Welcome Menu dikhao
+        targetKey = "welcome";
       }
 
-      // 4. FINAL RESPONSE (JSON Data handling)
-      if (targetKey || (userStatus === "normal" && !targetKey)) {
-        if (!targetKey) targetKey = "welcome";
-        let messagesDB = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-        const currentMsg = messagesDB[targetKey] || messagesDB["welcome"];
+      // --- 4. THE SENDING ENGINE (JSON se payload banana) ---
+      if (targetKey) {
+        let dbJson = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+        const currentMsg = dbJson[targetKey] || dbJson["welcome"];
+        
+        // Final Translation before sending
         const transBody = await translate(currentMsg.body.replace("{{name}}", userName), { to: userLang });
 
         let payload = {
-          messaging_product: "whatsapp", to: from, type: "interactive",
+          messaging_product: "whatsapp",
+          to: from,
+          type: "interactive",
           interactive: { type: currentMsg.type, body: { text: transBody.text } }
         };
 
@@ -131,3 +138,4 @@ export default async function handler(req, res) {
   }
   return res.status(200).send('OK');
 }
+
