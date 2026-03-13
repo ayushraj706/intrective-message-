@@ -3,13 +3,12 @@
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "@google/generative-ai": "^0.21.0",
-    "axios": "^1.6.0",
-    "firebase": "^10.8.0",
-    "google-translate-api-x": "^10.6.0"
+    "@google/generative-ai": "latest",
+    "axios": "^1.7.0",
+    "firebase": "^10.10.0",
+    "google-translate-api-x": "^10.7.0"
   },
   "engines": {
-    "node": "24.x"
+    "node": "22.x"
   }
 }
-
