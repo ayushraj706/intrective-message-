@@ -1,66 +1,62 @@
 import { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
-import { useRouter } from 'next/router';
-import { auth } from '../firebase';
-
-// Components Import
 import Sidebar from '../components/Sidebar';
 import MainDashboard from '../components/MainDashboard';
-import AIIntegration from '../components/setup/AIIntegration'; // नया सेटअप पेज
+import AIIntegration from '../components/setup/AIIntegration';
+import dynamic from 'next/dynamic';
+import { auth } from '../firebase';
+import { useRouter } from 'next/router';
+import { Menu, X } from 'lucide-react'; // मोबाइल मेनू के लिए
 
-// Inbox को dynamic import करना ज़रूरी है (SSR Error से बचने के लिए)
 const Inbox = dynamic(() => import('../components/Inbox'), { ssr: false });
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState('dashboard'); // Default: Channel Selector
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // मोबाइल साइडबार स्टेट
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // --- AUTH CHECK (Session Persistence) ---
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (!user) {
-        // अगर लॉग-इन नहीं है, तो लॉगिन पेज पर भेजें
-        router.push('/login');
-      } else {
-        setLoading(false);
-      }
+      if (!user) router.push('/login');
+      else setLoading(false);
     });
     return () => unsubscribe();
   }, [router]);
 
-  // Loading State (Professional Look)
-  if (loading) return (
-    <div className="h-screen bg-zinc-50 dark:bg-[#050505] flex flex-col items-center justify-center transition-colors duration-500">
-      <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-      <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest">Verifying Admin Access...</p>
-    </div>
-  );
+  if (loading) return <div className="h-screen bg-[#050505] flex items-center justify-center text-white font-mono uppercase text-[10px] tracking-widest">Loading Ayus Hub...</div>;
 
   return (
-    <div className="flex h-screen bg-zinc-50 dark:bg-[#111111] overflow-hidden text-zinc-900 dark:text-white font-sans transition-colors duration-300">
+    <div className="flex h-screen bg-zinc-50 dark:bg-[#080808] overflow-hidden text-zinc-900 dark:text-white font-sans transition-all">
       
-      {/* Sidebar: Tab Switching के लिए setActiveTab पास किया गया है */}
-      <Sidebar setActiveTab={setActiveTab} activeTab={activeTab} />
-      
-      <main className="flex-1 overflow-hidden relative">
-        
-        {/* 1. Channel Selector (Inboxes) */}
-        {activeTab === 'dashboard' && <MainDashboard />}
-        
-        {/* 2. Chat Interface (My Inbox) */}
-        {activeTab === 'inbox' && <Inbox />}
+      {/* 1. SIDEBAR (Mobile Friendly) */}
+      <div className={`fixed inset-y-0 left-0 z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-transform duration-300 ease-in-out w-64`}>
+        <Sidebar setActiveTab={(tab) => { setActiveTab(tab); setIsSidebarOpen(false); }} activeTab={activeTab} />
+      </div>
 
-        {/* 3. AI Setup Page (User अपना AI यहाँ सेट करेगा) */}
-        {activeTab === 'integration' && <AIIntegration onBack={() => setActiveTab('dashboard')} />}
+      {/* 2. OVERLAY (Side bar खुला होने पर मोबाइल में बाहर क्लिक करने के लिए) */}
+      {isSidebarOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>
+      )}
 
-        {/* 4. Contacts (PDF Logic के लिए जगह) */}
-        {activeTab === 'contacts' && (
-          <div className="p-12 animate-in fade-in duration-500">
-            <h2 className="text-4xl font-extrabold tracking-tighter mb-4">Contacts</h2>
-            <p className="text-zinc-500 text-lg">PDF Upload logic coming soon for data processing...</p>
-          </div>
-        )}
+      {/* 3. MAIN CONTENT AREA */}
+      <main className="flex-1 flex flex-col overflow-hidden relative">
+        
+        {/* MOBILE HEADER (सिर्फ मोबाइल पर दिखेगा) */}
+        <div className="md:hidden flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0a0a0a]">
+          <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-zinc-500 hover:text-blue-500 transition-colors">
+            <Menu size={24} />
+          </button>
+          <span className="font-black text-lg tracking-tighter text-blue-600">BaseKey</span>
+          <div className="w-10"></div> {/* बैलेंस के लिए खाली जगह */}
+        </div>
+
+        {/* Tab Content */}
+        <div className="flex-1 overflow-hidden relative">
+          {activeTab === 'dashboard' && <MainDashboard />}
+          {activeTab === 'inbox' && <Inbox />}
+          {activeTab === 'integration' && <AIIntegration onBack={() => setActiveTab('dashboard')} />}
+          {activeTab === 'contacts' && <div className="p-10 text-zinc-500">Contacts logic coming soon...</div>}
+        </div>
       </main>
     </div>
   );
