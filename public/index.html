@@ -3,11 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BaseKey AI | Official Dashboard</title>
+    <title>BaseKey AI | Official</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Theme Logic: System Default ya User Preference check karna
+        tailwind.config = {
+            darkMode: 'class',
+        }
+
+        function applyTheme() {
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark')
+            } else {
+                document.documentElement.classList.remove('dark')
+            }
+        }
+        applyTheme();
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #050505; color: white; }
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.3s, color 0.3s; }
         .glow { box-shadow: 0 0 20px rgba(34, 197, 94, 0.2); }
         .gradient-text {
             background: linear-gradient(to right, #22c55e, #3b82f6);
@@ -16,10 +31,17 @@
         }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen">
+<body class="bg-white text-black dark:bg-[#050505] dark:text-white flex items-center justify-center min-h-screen transition-all">
+
+    <div class="fixed top-6 right-6">
+        <button onclick="toggleTheme()" class="p-3 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:scale-110 transition-all shadow-sm">
+            <span id="theme-icon-light" class="hidden dark:block">☀️</span>
+            <span id="theme-icon-dark" class="block dark:hidden">🌙</span>
+        </button>
+    </div>
 
     <div class="text-center p-8 max-w-lg">
-        <div class="mb-6 inline-flex p-4 bg-green-500/10 rounded-3xl border border-green-500/20 glow">
+        <div class="mb-6 inline-flex p-4 bg-green-500/10 rounded-3xl border border-green-500/20 glow transition-transform hover:rotate-3">
             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         </div>
 
@@ -27,24 +49,38 @@
             Base<span class="gradient-text">Key</span> AI
         </h1>
         
-        <p class="text-gray-400 text-lg mb-8">
-            WhatsApp Business Automation aur AI Solutions ka official administrative pabal.
+        <p class="text-zinc-500 dark:text-zinc-400 text-lg mb-8 leading-relaxed">
+            WhatsApp Business Automation aur AI Solutions ka official administrative portal.
         </p>
 
-        <div class="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-full mb-10">
+        <div class="inline-flex items-center gap-2 px-4 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full mb-10 shadow-sm">
             <span class="relative flex h-3 w-3">
                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
             </span>
-            <span class="text-sm font-medium text-green-400">System Online: v1.0.0</span>
+            <span class="text-sm font-medium text-green-600 dark:text-green-400">System Online: v1.0.0</span>
         </div>
 
-        <div>
-            <a href="/api/whatsapp" class="text-zinc-500 hover:text-white text-xs transition-colors underline underline-offset-4">
-                API Endpoint Check
+        <div class="flex flex-col gap-4">
+            <a href="/login" class="bg-black dark:bg-white text-white dark:text-black px-10 py-4 rounded-2xl font-bold hover:scale-105 transition-all shadow-xl shadow-green-500/10">
+                Enter Dashboard
+            </a>
+            <a href="/api/whatsapp" class="text-zinc-400 hover:text-green-500 text-xs transition-colors underline underline-offset-4 decoration-zinc-700">
+                Check API Status
             </a>
         </div>
     </div>
 
+    <script>
+        function toggleTheme() {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.theme = 'light';
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.theme = 'dark';
+            }
+        }
+    </script>
 </body>
 </html>
