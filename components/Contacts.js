@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // 1. useEffect को यहाँ जोड़ा
 import { Users, Search, Smartphone, FileText, Loader2, Plus, ArrowRight, Trash2, RotateCcw } from 'lucide-react';
 
 const Contacts = () => {
@@ -6,7 +6,20 @@ const Contacts = () => {
   const [extractedContacts, setExtractedContacts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 1. फाइल अपलोड और स्मार्ट पार्सिंग (Fix for Mobile File Picker)
+  // 2. जब ऐप पहली बार खुले, तब LocalStorage से पुराना डेटा लोड करना
+  useEffect(() => {
+    const savedContacts = localStorage.getItem('basekey_contacts');
+    if (savedContacts) {
+      setExtractedContacts(JSON.parse(savedContacts));
+    }
+  }, []);
+
+  // 3. जब भी extractedContacts बदले, उसे LocalStorage में सेव करना
+  useEffect(() => {
+    localStorage.setItem('basekey_contacts', JSON.stringify(extractedContacts));
+  }, [extractedContacts]);
+
+  // फाइल अपलोड और स्मार्ट पार्सिंग (आपकी फाइल्स के कॉलम नेम्स के हिसाब से)
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -24,12 +37,12 @@ const Contacts = () => {
         return;
       }
 
-      // 'phone_number' कॉलम का पता लगाना (Smart Header Search)
       const headers = rows[0].map(h => h.trim().toLowerCase());
+      [span_0](start_span)// आपकी फाइल्स में 'phone_number'[span_0](end_span) [span_1](start_span)या 'number'[span_1](end_span) जैसे कॉलम्स हैं
       const phoneIndex = headers.findIndex(h => h.includes('phone') || h.includes('number'));
 
       if (phoneIndex === -1) {
-        alert("CSV में 'phone_number' कॉलम नहीं मिला!");
+        alert("CSV में फोन नंबर वाला कॉलम नहीं मिला!");
         setIsUploading(false);
         return;
       }
@@ -38,7 +51,6 @@ const Contacts = () => {
       for (let i = 1; i < rows.length; i++) {
         let phone = rows[i][phoneIndex];
         if (phone) {
-          // नंबर को क्लीन करना: सिर्फ अंक बचाना
           let cleanPhone = phone.replace(/[^0-9]/g, '').trim();
           if (cleanPhone.length >= 10) {
             numbersFound.push('+' + cleanPhone);
@@ -55,16 +67,15 @@ const Contacts = () => {
     reader.readAsText(file);
   };
 
-  // 2. सिंगल नंबर डिलीट करना
   const deleteContact = (numToDelete) => {
     const updatedList = extractedContacts.filter(num => num !== numToDelete);
     setExtractedContacts(updatedList);
   };
 
-  // 3. पूरी लिस्ट साफ करना
   const clearAllContacts = () => {
     if (window.confirm("क्या आप पूरी लिस्ट डिलीट करना चाहते हैं?")) {
       setExtractedContacts([]);
+      localStorage.removeItem('basekey_contacts'); // स्टोरेज भी साफ करें
     }
   };
 
@@ -78,7 +89,7 @@ const Contacts = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
           <div>
             <h1 className="text-5xl font-black tracking-tighter dark:text-white italic uppercase">BaseKey Contacts</h1>
-            <p className="text-zinc-500 text-sm mt-2 font-medium">Manage your WhatsApp lists efficiently.</p>
+            <p className="text-zinc-500 text-sm mt-2 font-medium">Your list is now saved in the browser memory.</p>
           </div>
           
           <div className="flex items-center gap-3">
@@ -86,7 +97,6 @@ const Contacts = () => {
               <button 
                 onClick={clearAllContacts}
                 className="p-4 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all shadow-sm"
-                title="Clear All"
               >
                 <RotateCcw size={20} />
               </button>
@@ -94,13 +104,11 @@ const Contacts = () => {
             <label className="group flex items-center gap-3 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-bold cursor-pointer transition-all shadow-xl shadow-blue-600/20 active:scale-95">
               {isUploading ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} className="group-hover:rotate-90 transition-transform" />}
               <span>{isUploading ? 'Extracting...' : 'Upload CSV'}</span>
-              
-              {/* --- FIX HERE: Added multiple MIME types for Mobile Support --- */}
               <input 
                 type="file" 
                 className="hidden" 
                 onChange={handleFileUpload} 
-                accept=".csv, text/csv, application/vnd.ms-excel, application/csv, text/plain" 
+                accept=".csv, text/csv, application/vnd.ms-excel, text/plain" // मोबाइल फिक्स यहाँ है
               />
             </label>
           </div>
@@ -111,19 +119,19 @@ const Contacts = () => {
             <div className="w-14 h-14 bg-blue-100 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center text-blue-600 mb-6">
               <Users size={28} />
             </div>
-            <p className="text-zinc-500 text-xs font-bold uppercase tracking-[0.2em]">Ready to Message</p>
+            <p className="text-zinc-500 text-xs font-bold uppercase tracking-[0.2em]">Persistent List</p>
             <h3 className="text-5xl font-black dark:text-white mt-2">{extractedContacts.length}</h3>
           </div>
 
           <div className="lg:col-span-2 bg-white dark:bg-zinc-900/50 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
             <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/80 backdrop-blur-md flex flex-col md:flex-row items-center justify-between gap-4">
-              <h4 className="font-bold dark:text-white text-lg px-2">Contacts List</h4>
+              <h4 className="font-bold dark:text-white text-lg px-2">Saved Contacts</h4>
               <div className="relative w-full md:w-64">
                 <Search className="absolute left-4 top-3 text-zinc-500" size={16} />
                 <input 
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Filter numbers..." 
+                  placeholder="Filter list..." 
                   className="w-full bg-zinc-100 dark:bg-zinc-800/50 rounded-xl py-2.5 pl-11 pr-4 text-xs outline-none focus:ring-2 ring-blue-500/20 transition-all dark:text-white" 
                 />
               </div>
@@ -154,7 +162,7 @@ const Contacts = () => {
               )) : (
                 <div className="flex-1 flex flex-col items-center justify-center p-20 opacity-30">
                   <FileText size={64} className="mb-4" />
-                  <p className="text-zinc-400 font-bold uppercase tracking-[0.3em] text-[10px]">No Data Extracted</p>
+                  <p className="text-zinc-400 font-bold uppercase tracking-[0.3em] text-[10px]">Empty List</p>
                 </div>
               )}
             </div>
@@ -166,4 +174,3 @@ const Contacts = () => {
 };
 
 export default Contacts;
-                    
