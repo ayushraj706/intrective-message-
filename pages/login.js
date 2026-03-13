@@ -1,59 +1,60 @@
-import { useState, useEffect } from 'react';
-import { auth } from '../firebase'; // अब ये एरर नहीं देगा
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { useRouter } from 'next/router';
-import { Lock, Mail, Moon, Sun } from 'lucide-react';
+import { useState } from 'react';
+import { auth } from '../firebase';
+import { sendSignInLinkToEmail } from 'firebase/auth';
+import { Mail, Send } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [darkMode, setDarkMode] = useState(true);
-  const router = useRouter();
+  const [sent, setSent] = useState(false);
 
-  useEffect(() => {
-    if (darkMode) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-  }, [darkMode]);
-
-  const handleLogin = async (e) => {
+  const handleMagicLink = async (e) => {
     e.preventDefault();
+    const actionCodeSettings = {
+      // Login के बाद यूजर कहाँ जाएगा
+      url: window.location.origin + '/dashboard', 
+      handleCodeInApp: true,
+    };
+
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push('/dashboard');
+      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+      // ईमेल को लोकल स्टोरेज में सेव करना ज़रूरी है ताकि लिंक क्लिक करने पर मैच हो सके
+      window.localStorage.setItem('emailForSignIn', email);
+      setSent(true);
     } catch (error) {
       alert("Error: " + error.message);
     }
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[#050505] flex items-center justify-center p-6 transition-all">
-      <button 
-        onClick={() => setDarkMode(!darkMode)}
-        className="fixed top-6 right-6 p-3 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm"
-      >
-        {darkMode ? <Sun size={20} className="text-yellow-500" /> : <Moon size={20} className="text-zinc-600" />}
-      </button>
-
-      <div className="w-full max-w-md bg-white dark:bg-[#121212] border border-zinc-200 dark:border-gray-800 rounded-3xl p-8 shadow-xl">
-        <h1 className="text-3xl font-bold text-zinc-900 dark:text-white mb-8 text-center">Admin Login</h1>
-        
-        <form onSubmit={handleLogin} className="space-y-4">
-          <input 
-            type="email" 
-            placeholder="Email" 
-            className="w-full p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-black text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <input 
-            type="password" 
-            placeholder="Password" 
-            className="w-full p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-black text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20">
-            Log In
-          </button>
-        </form>
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center p-6 text-white font-sans">
+      <div className="w-full max-w-md bg-[#121212] border border-gray-800 rounded-3xl p-8">
+        {!sent ? (
+          <>
+            <h1 className="text-3xl font-bold mb-4 text-center tracking-tighter">Magic Login 🪄</h1>
+            <p className="text-gray-400 text-center mb-8 text-sm">अपना एडमिन ईमेल डालें, हम आपको एक सीक्रेट एंट्री लिंक भेजेंगे।</p>
+            <form onSubmit={handleMagicLink} className="space-y-4">
+              <div className="relative">
+                <Mail className="absolute left-4 top-4 text-gray-500" size={18} />
+                <input 
+                  type="email" 
+                  placeholder="admin@basekey.ai" 
+                  className="w-full bg-black border border-gray-800 rounded-xl px-12 py-4 focus:border-green-500 outline-none"
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <button type="submit" className="w-full bg-green-600 hover:bg-green-500 py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all">
+                Send Magic Link <Send size={18} />
+              </button>
+            </form>
+          </>
+        ) : (
+          <div className="text-center">
+            <div className="text-5xl mb-4">📧</div>
+            <h2 className="text-2xl font-bold mb-2">Check your Email!</h2>
+            <p className="text-gray-400">हमने <b>{email}</b> पर एक लॉगिन लिंक भेजा है। उस पर क्लिक करते ही आप डैशबोर्ड में पहुँच जाएंगे।</p>
+          </div>
+        )}
       </div>
     </div>
   );
