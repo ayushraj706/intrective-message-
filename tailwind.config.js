@@ -4,10 +4,9 @@ export default {
     "./pages/**/*.{js,ts,jsx,tsx}",
     "./components/**/*.{js,ts,jsx,tsx}",
   ],
-  darkMode: 'class',
+  darkMode: 'media', // <-- 'class' की जगह 'media' कर दो
   theme: {
     extend: {},
   },
   plugins: [],
 }
-
