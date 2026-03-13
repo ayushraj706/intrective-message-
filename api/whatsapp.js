@@ -21,6 +21,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export default async function handler(req, res) {
   const jsonPath = path.join(process.cwd(), 'interactive-message.json');
+  
   if (req.method === 'GET') {
     const token = req.query['hub.verify_token'];
     if (token === 'Ayush@7859032663') return res.status(200).send(req.query['hub.challenge']);
@@ -45,37 +46,36 @@ export default async function handler(req, res) {
       let currentTime = Date.now();
       let targetKey = null;
 
-      // 1. TIMEOUT CHECK
+      // 1. TIMEOUT LOGIC (5 Mins)
       if (userStatus === "chatting_with_ai" && (currentTime - lastTime) > 300000) {
         userStatus = "normal";
         await updateDoc(userRef, { status: "normal" });
       }
 
-      // 2. GEMINI AI (TEXT & DOCUMENTS/IMAGES)
+      [span_0](start_span)[span_1](start_span)// 2. GEMINI AI MODE (Text + Photos + PDF)[span_0](end_span)[span_1](end_span)
       if (userStatus === "chatting_with_ai" && (msg.type === "text" || msg.type === "image" || msg.type === "document")) {
         try {
           const aiModel = genAI.getGenerativeModel({ 
             model: "gemini-1.5-flash", 
-            systemInstruction: "You are an assistant for Ayush Raj's BaseKey & SuperKey. Be concise." 
+            systemInstruction: "You are an assistant for Ayush Raj's BaseKey and SuperKey. Be concise and help with documents." 
           });
 
-          let aiInput = [msg.text?.body || "Analyze this file."];
-
+          let aiParts = [msg.text?.body || "Analyze this file."];
           if (msg.type === "image" || msg.type === "document") {
             const mediaId = msg.image?.id || msg.document?.id;
             const mimeType = msg.image?.mime_type || msg.document?.mime_type;
             const mediaRes = await axios.get(`https://graph.facebook.com/v18.0/${mediaId}`, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } });
             const fileData = await axios.get(mediaRes.data.url, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }, responseType: 'arraybuffer' });
-            aiInput.push({ inlineData: { data: Buffer.from(fileData.data).toString("base64"), mimeType } });
+            aiParts.push({ inlineData: { data: Buffer.from(fileData.data).toString("base64"), mimeType } });
           }
 
-          const result = await aiModel.generateContent(aiInput);
+          const result = await aiModel.generateContent(aiParts);
           const transAi = await translate(result.response.text(), { to: userLang });
-          let finalReply = transAi.text.substring(0, 1000);
+          let replyText = transAi.text.substring(0, 1000);
 
           await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, {
             messaging_product: "whatsapp", to: from, type: "interactive",
-            interactive: { type: "button", body: { text: finalReply }, action: { buttons: [{ type: "reply", reply: { id: "main_menu", title: "🏠 Main Menu" } }] } }
+            interactive: { type: "button", body: { text: replyText }, action: { buttons: [{ type: "reply", reply: { id: "main_menu", title: "🏠 Main Menu" } }] } }
           }, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } });
 
           await updateDoc(userRef, { lastInteraction: Timestamp.now() });
@@ -83,9 +83,10 @@ export default async function handler(req, res) {
         } catch (e) { return res.status(200).send('OK'); }
       }
 
-      // 3. INTERACTIVE HANDLING (Language & Menu)
+      // 3. INTERACTIVE MESSAGE HANDLING (IDs logic)
       if (msg.type === 'interactive') {
         const replyId = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id;
+        
         if (replyId.startsWith("lang_")) {
           const lCode = replyId.split("_")[1];
           if (!["1", "2", "3"].includes(lCode)) {
@@ -97,25 +98,34 @@ export default async function handler(req, res) {
           targetKey = "gemini_helper";
         } else if (replyId === "main_menu") {
           targetKey = "welcome"; await updateDoc(userRef, { status: "normal", lastInteraction: Timestamp.now() });
-        } else { targetKey = replyId; }
+        } else {
+          targetKey = replyId; 
+        }
       }
 
-      // 4. FINAL RESPONSE (JSON Logic)
-      if (targetKey || (!targetKey && userStatus === "normal")) {
+      // 4. FINAL RESPONSE (JSON Data handling)
+      if (targetKey || (userStatus === "normal" && !targetKey)) {
         if (!targetKey) targetKey = "welcome";
-        let dbJson = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-        const currentMsg = dbJson[targetKey] || dbJson["welcome"];
+        let messagesDB = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+        const currentMsg = messagesDB[targetKey] || messagesDB["welcome"];
         const transBody = await translate(currentMsg.body.replace("{{name}}", userName), { to: userLang });
-        let payload = { messaging_product: "whatsapp", to: from, type: "interactive", interactive: { type: currentMsg.type, body: { text: transBody.text } } };
+
+        let payload = {
+          messaging_product: "whatsapp", to: from, type: "interactive",
+          interactive: { type: currentMsg.type, body: { text: transBody.text } }
+        };
 
         if (currentMsg.type === "cta_url") {
           payload.interactive.action = { name: "cta_url", parameters: { display_text: currentMsg.button_text, url: currentMsg.url } };
         } else if (currentMsg.type === "button" || currentMsg.type === "reply") {
           payload.interactive.action = { buttons: currentMsg.buttons.map(b => ({ type: "reply", reply: b })) };
         } else if (currentMsg.type === "list") {
-          payload.interactive.action = { button: "विकल्प", sections: [{ title: "Select", rows: currentMsg.rows }] };
+          payload.interactive.action = { button: "विकल्प", sections: [{ title: "Menu", rows: currentMsg.rows }] };
         }
-        await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, payload, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } });
+
+        await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, payload, {
+          headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
+        });
       }
     }
   }
