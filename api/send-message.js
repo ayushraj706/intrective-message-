@@ -2,7 +2,6 @@ import axios from 'axios';
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 
-// --- FIREBASE CONFIG (Consistently using your project details) ---
 const firebaseConfig = {
   apiKey: "AIzaSyCCqWVSgULjZtgfOqVX3CBmOonxkr2UB7g",
   authDomain: "whatsapp-950a8.firebaseapp.com",
@@ -12,46 +11,45 @@ const firebaseConfig = {
   appId: "1:526342181957:web:0e71810f3ccbb297413f2c"
 };
 
-// Initialize Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 
 export default async function handler(req, res) {
-  // सिर्फ POST रिक्वेस्ट की अनुमति है
   if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
 
-  const { userId, to, text } = req.body;
+  const { userId, to, mediaUrl, mediaType } = req.body;
 
-  // 1. डेटा की जांच (Validation)
-  if (!userId || !to || !text) {
-    return res.status(400).json({ error: "Missing required fields: userId, to, or text" });
+  // 1. Data Verification
+  if (!userId || !to || !mediaUrl) {
+    return res.status(400).json({ error: "Missing media data", received: { userId, to, mediaUrl } });
   }
 
   try {
-    // 2. Firestore से यूजर की WhatsApp सेटिंग्स निकालना
+    // 2. Firestore से Config लाना
     const configSnap = await getDoc(doc(db, "configs", userId));
+    if (!configSnap.exists()) return res.status(404).json({ error: "Config not found" });
     
-    if (!configSnap.exists()) {
-      console.error(`Config not found for UID: ${userId}`);
-      return res.status(404).json({ error: "WhatsApp configuration not found for this user." });
-    }
-
     const { accessToken, phoneId } = configSnap.data();
 
-    if (!accessToken || !phoneId) {
-      return res.status(400).json({ error: "AccessToken or PhoneID missing in Firestore config." });
-    }
+    // 3. Meta API Payload (व्हाट्सएप के लिए एकदम सही फॉर्मेट)
+    const payload = {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: to,
+      type: mediaType === 'image' ? 'image' : 'document',
+      [mediaType === 'image' ? 'image' : 'document']: {
+        link: mediaUrl,
+        // Document के लिए कैप्शन या नाम ज़रूरी हो सकता है
+        ...(mediaType === 'document' && { filename: "BaseKey_Document" })
+      }
+    };
 
-    // 3. Meta (WhatsApp) API को मैसेज भेजना
-    const metaResponse = await axios.post(
+    console.log("Sending Media to Meta...");
+
+    // 4. Meta API को कॉल करना
+    const metaRes = await axios.post(
       `https://graph.facebook.com/v18.0/${phoneId}/messages`,
-      {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: to,
-        type: "text",
-        text: { body: text }
-      },
+      payload,
       { 
         headers: { 
           'Authorization': `Bearer ${accessToken}`,
@@ -60,29 +58,26 @@ export default async function handler(req, res) {
       }
     );
 
-    // 4. मैसेज को डेटाबेस (History) में सेव करना
-    // हम इसे 'users/[userId]/messages' के पाथ पर सेव कर रहे हैं
+    // 5. Firestore History में सेव करना
     await addDoc(collection(db, "users", userId, "messages"), {
-      text: text,
-      sender: 'admin', 
-      senderNumber: to, // कस्टमर का नंबर
+      text: mediaType === 'image' ? "📷 Photo Message" : "📄 Document Message",
+      mediaUrl: mediaUrl,
+      mediaType: mediaType,
+      sender: 'admin',
+      senderNumber: to,
       timestamp: serverTimestamp(),
     });
 
-    // सफलता का जवाब
-    return res.status(200).json({ 
-      success: true, 
-      messageId: metaResponse.data.messages[0].id 
-    });
+    return res.status(200).json({ success: true, metaResponse: metaRes.data });
 
   } catch (error) {
-    // अगर कुछ गड़बड़ हुई, तो यहाँ पकड़ी जाएगी
-    const errorData = error.response?.data || error.message;
-    console.error("CRITICAL ERROR in send-message.js:", JSON.stringify(errorData, null, 2));
+    // असली एरर यहाँ दिखेगा
+    const errorDetail = error.response?.data || error.message;
+    console.error("META REJECTED MEDIA:", JSON.stringify(errorDetail, null, 2));
     
     return res.status(500).json({ 
-      error: "Failed to send WhatsApp message", 
-      details: errorData 
+      error: "Meta rejected the media request", 
+      details: errorDetail 
     });
   }
 }
