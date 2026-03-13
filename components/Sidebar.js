@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, Users, BarChart3, Globe, Settings, ChevronDown } from 'lucide-react';
+import { MessageSquare, Users, BarChart3, Globe, Settings, ChevronDown, Bot } from 'lucide-react';
 
 const Sidebar = ({ setActiveTab, activeTab }) => {
   return (
@@ -13,6 +13,10 @@ const Sidebar = ({ setActiveTab, activeTab }) => {
         <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-600 font-bold mb-3 block px-3">Main</label>
         <NavItem icon={<MessageSquare size={19}/>} label="My Inbox" active={activeTab === 'inbox'} onClick={() => setActiveTab('inbox')} />
         <NavItem icon={<Users size={19}/>} label="Contacts" active={activeTab === 'contacts'} onClick={() => setActiveTab('contacts')} />
+        
+        {/* YE RAHA NAYA BUTTON */}
+        <NavItem icon={<Bot size={19}/>} label="AI Integration" active={activeTab === 'integration'} onClick={() => setActiveTab('integration')} />
+        
         <NavItem icon={<BarChart3 size={19}/>} label="Reports" />
 
         <div className="mt-8 mb-3 px-3 flex justify-between items-center">
