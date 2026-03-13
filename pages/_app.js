@@ -1,4 +1,4 @@
-import '../styles/globals.css'; // ये लाइन सबसे ऊपर होनी चाहिए
+import '../styles/globals.css';
 
 function MyApp({ Component, pageProps }) {
   return <Component {...pageProps} />;
