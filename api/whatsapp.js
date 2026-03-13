@@ -1,12 +1,10 @@
 import axios from 'axios';
-import fs from 'fs';
-import path from 'path';
-import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, Timestamp } from "firebase/firestore";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import translate from 'google-translate-api-x';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Firebase Configuration
+// Firebase Configuration (Same as yours)
 const firebaseConfig = {
   apiKey: "AIzaSyCCqWVSgULjZtgfOqVX3CBmOonxkr2UB7g",
   authDomain: "whatsapp-950a8.firebaseapp.com",
@@ -16,128 +14,81 @@ const firebaseConfig = {
   appId: "1:526342181957:web:0e71810f3ccbb297413f2c"
 };
 
-const app = initializeApp(firebaseConfig);
+// Singleton pattern for Firebase
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export default async function handler(req, res) {
-  const jsonPath = path.join(process.cwd(), 'interactive-message.json');
+  // URL से userId निकालना (e.g., /api/webhook/user123)
+  const { userId } = req.query;
+
+  if (!userId) return res.status(400).send("User ID missing");
+
+  // --- 1. FIRESTORE से यूजर की कॉन्फ़िगरेशन उठाना ---
+  // हम मान रहे हैं कि 'configs' में आपने 'whatsapp' और 'ai_setup' डेटा रखा है
+  const waConfigRef = doc(db, "configs", userId); // हर यूजर का अपना डॉक्युमेंट
+  const aiConfigRef = doc(db, "configs", `${userId}_ai`); 
   
+  const waSnap = await getDoc(waConfigRef);
+  if (!waSnap.exists()) return res.status(404).send("User not configured");
+  
+  const waData = waSnap.data();
+  const WHATSAPP_ACCESS_TOKEN = waData.accessToken;
+  const VERIFY_TOKEN = waData.webhookVerifyToken || "basekey_default";
+
+  // --- 2. WEBHOOK VERIFICATION (GET Request) ---
   if (req.method === 'GET') {
+    const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
-    if (token === 'Ayush@7859032663') return res.status(200).send(req.query['hub.challenge']);
+    const challenge = req.query['hub.challenge'];
+
+    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+      return res.status(200).send(challenge);
+    }
     return res.status(403).send('Forbidden');
   }
 
+  // --- 3. INCOMING MESSAGE (POST Request) ---
   if (req.method === 'POST') {
     const value = req.body.entry?.[0]?.changes?.[0]?.value;
-
     if (value && value.messages) {
       const msg = value.messages[0];
       const from = msg.from;
-      const userName = value.contacts?.[0]?.profile?.name || "User";
-      const incoming_phone_id = value.metadata.phone_number_id; 
+      const incoming_phone_id = value.metadata.phone_number_id;
 
-      const userRef = doc(db, "users", from);
-      const userSnap = await getDoc(userRef);
-      const userData = userSnap.exists() ? userSnap.data() : { lang: 'hi', status: 'normal' };
-      
-      let userLang = userData.lang || "hi";
-      let userStatus = userData.status || "normal";
-      let targetKey = null;
+      // यूजर की AI सेटिंग चेक करना
+      const aiSnap = await getDoc(aiConfigRef);
+      const aiData = aiSnap.exists() ? aiSnap.data() : { aiType: 'none' };
 
       try {
-        // --- 1. PRIORITY: GEMINI MULTIMODAL AI (Photo/PDF/Text Support) ---
-        // Build multimodal RAG with new Gemini Embedding.pdf]
-        if (userStatus === "chatting_with_ai" && (msg.type === "text" || msg.type === "image" || msg.type === "document")) {
-          const aiModel = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash", 
-            systemInstruction: "You are a professional assistant for Ayush Raj's platforms: BaseKey, SuperKey, and LockerKey. Analyze media carefully and be concise." 
-          });
+        // --- मैसेज को यूजर के पर्सनल फोल्डर में सेव करना ---
+        await addDoc(collection(db, "users", userId, "messages"), {
+          text: msg.text?.body || "Media Message",
+          sender: 'customer',
+          senderNumber: from,
+          timestamp: serverTimestamp(),
+        });
 
-          let aiParts = [msg.text?.body || "Please analyze this file."];
+        // --- AI LOGIC (अगर यूजर ने AI सेटअप किया है) ---
+        if (aiData.aiType !== 'none' && aiData.config?.apiKey) {
+          const genAI = new GoogleGenerativeAI(aiData.config.apiKey);
+          const aiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-          if (msg.type === "image" || msg.type === "document") {
-            const mediaId = msg.image?.id || msg.document?.id;
-            const mimeType = msg.image?.mime_type || msg.document?.mime_type;
-            
-            // Meta API से मीडिया का URL प्राप्त करना
-            const mediaRes = await axios.get(`https://graph.facebook.com/v18.0/${mediaId}`, {
-              headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
-            });
-            // फाइल डाउनलोड करना
-            const fileBuffer = await axios.get(mediaRes.data.url, {
-              headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` },
-              responseType: 'arraybuffer'
-            });
+          // AI Response logic... (आप वाला ही कोड यहाँ आएगा, बस API Key यूजर की होगी)
+          const result = await aiModel.generateContent(msg.text?.body || "Hello");
+          const aiResponse = result.response.text();
 
-            aiParts.push({
-              inlineData: { data: Buffer.from(fileBuffer.data).toString("base64"), mimeType }
-            });
-          }
-
-          const result = await aiModel.generateContent(aiParts);
-          const transAi = await translate(result.response.text(), { to: userLang });
-
+          // व्हाट्सएप पर जवाब भेजना
           await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, {
-            messaging_product: "whatsapp", to: from, type: "interactive",
-            interactive: {
-              type: "button",
-              body: { text: transAi.text.substring(0, 1024) },
-              action: { buttons: [{ type: "reply", reply: { id: "main_menu", title: "🏠 Main Menu" } }] }
-            }
-          }, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } });
-
-          await updateDoc(userRef, { lastInteraction: Timestamp.now() });
-          return res.status(200).send('OK'); // AI रिप्लाई के बाद फंक्शन समाप्त
-        }
-
-        // --- 2. INTERACTIVE HANDLING ---
-        if (msg.type === 'interactive') {
-          const replyId = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id;
-          if (replyId === "gemini_helper") {
-            await setDoc(userRef, { status: "chatting_with_ai", lastInteraction: Timestamp.now() }, { merge: true });
-            targetKey = "gemini_helper";
-          } else if (replyId === "main_menu") {
-            targetKey = "welcome";
-            await updateDoc(userRef, { status: "normal" });
-          } else { targetKey = replyId; }
-        } else if (msg.type === 'text') {
-          targetKey = "welcome"; 
-        }
-
-        // --- 3. DYNAMIC RESPONSE BUILDER (Fixing 400 Error) ---
-        if (targetKey) {
-          const dbJson = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-          const currentMsg = dbJson[targetKey] || dbJson["welcome"];
-
-          // ERROR FIX: 'reply' टाइप को 'button' में बदलना ताकि WhatsApp 400 एरर न दे
-          const apiType = (currentMsg.type === "reply" || currentMsg.type === "button") ? "button" : currentMsg.type;
-
-          const transBody = await translate(currentMsg.body.replace("{{name}}", userName), { to: userLang });
-
-          let payload = {
-            messaging_product: "whatsapp", to: from, type: "interactive",
-            interactive: { type: apiType, body: { text: transBody.text } }
-          };
-
-          if (apiType === "cta_url") {
-            payload.interactive.action = { name: "cta_url", parameters: { display_text: currentMsg.button_text, url: currentMsg.url } };
-          } else if (apiType === "button") {
-            payload.interactive.action = { buttons: currentMsg.buttons.map(b => ({ type: "reply", reply: b })) };
-          } else if (apiType === "list") {
-            payload.interactive.action = { button: "विकल्प", sections: [{ title: "Menu", rows: currentMsg.rows }] };
-          }
-
-          await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, payload, {
-            headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
-          });
+            messaging_product: "whatsapp",
+            to: from,
+            text: { body: aiResponse }
+          }, { headers: { Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}` } });
         }
       } catch (err) {
-        console.error("Handler Logic Error:", err.message);
+        console.error("Multi-tenant Error:", err.message);
       }
     }
-    // Vercel termination फिक्स: res.send को सबसे अंत में रखा गया है
     return res.status(200).send('OK');
   }
 }
