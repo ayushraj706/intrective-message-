@@ -9,7 +9,7 @@
       { "id": "lang_mr", "title": "Marathi", "description": "मराठी" },
       { "id": "lang_te", "title": "Telugu", "description": "తెలుగు" },
       { "id": "lang_ta", "title": "Tamil", "description": "தமிழ்" },
-      { "id": "lang_gu", "title": "Gujarati", "description": "ગુજરાતી" },
+      { "id": "lang_gu", "title": "Gujarati", "description": "ગુજરાती" },
       { "id": "lang_ur", "title": "Urdu", "description": "اردو" },
       { "id": "lang_kn", "title": "Kannada", "description": "ಕನ್ನಡ" },
       { "id": "lang_2", "title": "आगामी भाषाएँ ➡️", "description": "अन्य विकल्प देखें" }
@@ -38,7 +38,7 @@
       { "id": "lang_sa", "title": "संस्कृतम्", "description": "देववाणी" },
       { "id": "lang_sd", "title": "Sindhi", "description": "سنڌي" },
       { "id": "lang_doi", "title": "Dogri", "description": "डोगरी" },
-      { "id": "lang_mni", "title": "Manipuri", "description": "মৈতৈলোन" },
+      { "id": "lang_mni", "title": "Manipuri", "description": "মৈতৈलोन" },
       { "id": "lang_brx", "title": "Bodo", "description": "बड़ो" },
       { "id": "lang_ar", "title": "Arabic", "description": "العربية" },
       { "id": "lang_fr", "title": "French", "description": "Français" },
@@ -49,7 +49,7 @@
   },
   "welcome": {
     "type": "list",
-    "body": "नमस्ते _*{{name}}*_, बेसकी (BaseKey) एवं सुपरकी (SuperKey) के आधिकारिक वैधानिक पटल पर आपका हार्दिक अभिनंदन है। मैं आपकी किस प्रकार सहायता कर सकता हूँ?",
+    "body": "नमस्ते _*{{name}}*_, बेसकी (BaseKey) एवं सुपरकी (SuperKey) के आधिकारिक वैधानिक पटल पर आपका हार्दिक अभिनंदन है। मैं आपकी किस प्रकार सहायता करने हेतु तत्पर हो सकता हूँ?",
     "rows": [
       { "id": "basekey_hub", "title": "🚀 बेसकी प्रणाली", "description": "व्हाट्सएप स्वचालन समाधान" },
       { "id": "superkey_hub", "title": "🏢 सुपरकी प्रतिष्ठान", "description": "निविदा एवं आईटी सेवाएँ" },
@@ -60,34 +60,41 @@
     ]
   },
   "gemini_helper": {
-    "type": "reply",
+    "type": "button",
     "body": "नमस्ते! मैं *Gemini AI* हूँ।\n\nमैं बेसकी, सुपरकी और तकनीकी समस्याओं को हल करने में आपकी मदद कर सकता हूँ। आप मुझे **फोटो या PDF** भी भेज सकते हैं।\n\n⚠️ *ध्यान दें:* ५ मिनट की निष्क्रियता पर सत्र स्वतः समाप्त हो जाएगा।\n\n*अपना प्रश्न यहाँ टाइप करें:*",
     "buttons": [
       { "id": "main_menu", "title": "🏠 मुख्य मेनू" }
     ]
   },
+  "contact_us": {
+    "type": "button",
+    "body": "प्रत्यक्ष संवाद स्थापित करने हेतु अधोलिखित दूरभाष संख्या का उपयोग करें:\n\n📞 +919229966001\n\nआपकी जिज्ञासाओं का निवारण हमारा परम उद्देश्य है।",
+    "buttons": [
+      { "id": "main_menu", "title": "🏠 मुख्य मेनू" }
+    ]
+  },
   "basekey_hub": {
-    "type": "reply",
+    "type": "button",
     "body": "बेसकी एक अत्याधुनिक व्हाट्सएप बिजनेस एपीआई व्यवस्था है जो प्रतिष्ठानों को डिजिटल सशक्तिकरण एवं सुव्यवस्थित स्वचालन की अद्वितीय शक्ति प्रदान करती है।",
     "buttons": [
-      { "id": "bk_features", "title": "विशिष्टताएँ" },
-      { "id": "bk_pricing", "title": "मूल्य निर्धारण" },
-      { "id": "bk_web", "title": "बेसकी पटल" }
+      { "id": "bk_features", "title": "✨ विशिष्टताएँ" },
+      { "id": "bk_pricing", "title": "💰 मूल्य निर्धारण" },
+      { "id": "bk_web", "title": "🌐 बेसकी पटल" }
     ]
   },
   "bk_features": {
-    "type": "reply",
+    "type": "button",
     "body": "बेसकी की प्रमुख विशिष्टताएँ:\n१. साझा दल इनबॉक्स\n२. संवादात्मक बटन एवं सूचियाँ\n३. स्वचालित चैटबॉट प्रवाह\n४. वास्तविक समय विश्लेषण।",
     "buttons": [
-      { "id": "bk_pricing", "title": "मूल्य निर्धारण" },
+      { "id": "bk_pricing", "title": "💰 मूल्य निर्धारण" },
       { "id": "main_menu", "title": "🏠 मुख्य मेनू" }
     ]
   },
   "bk_pricing": {
-    "type": "reply",
+    "type": "button",
     "body": "मूल्य निर्धारण योजनाएँ:\n- स्टार्टअप: निःशुल्क (परीक्षण)\n- प्रोफेशनल: ₹९९९/माह\n- एंटरप्राइज: उच्च मात्रा हेतु अनुकूलित समाधान।",
     "buttons": [
-      { "id": "contact_sales", "title": "विक्रय प्रतिनिधि" },
+      { "id": "contact_sales", "title": "🤝 विक्रय प्रतिनिधि" },
       { "id": "main_menu", "title": "🏠 मुख्य मेनू" }
     ]
   },
@@ -98,34 +105,34 @@
     "url": "https://ayus.fun"
   },
   "superkey_hub": {
-    "type": "reply",
+    "type": "button",
     "body": "सुपरकी समस्तीपुर, बिहार स्थित एक पंजीकृत तकनीकी संस्था है जो सरकारी निविदाओं (CPPP) एवं उन्नत वेब अनुप्रयोगों के निर्माण में विशेषज्ञता रखती है।",
     "buttons": [
-      { "id": "sk_gov", "title": "सरकारी निविदा" },
-      { "id": "sk_dev", "title": "वेब विकास" },
-      { "id": "sk_udyam", "title": "पंजीकरण विवरण" }
+      { "id": "sk_gov", "title": "🏢 सरकारी निविदा" },
+      { "id": "sk_dev", "title": "💻 वेब विकास" },
+      { "id": "sk_udyam", "title": "📋 पंजीकरण विवरण" }
     ]
   },
   "sk_gov": {
-    "type": "reply",
+    "type": "button",
     "body": "सुपरकी केंद्रीय सार्वजनिक खरीद पोर्टल (CPPP) पर पंजीकृत है और हम राजकीय निविदाओं के प्रति उत्तरदायी बोली लगाने हेतु अधिकृत हैं।",
     "buttons": [
-      { "id": "sk_services", "title": "सेवाओं की सूची" },
+      { "id": "sk_portfolio", "title": "📁 पोर्टफोलियो" },
       { "id": "main_menu", "title": "🏠 मुख्य मेनू" }
     ]
   },
   "sk_udyam": {
-    "type": "reply",
+    "type": "button",
     "body": "सुपरकी सूक्ष्म, लघु एवं मध्यम उद्यम (MSME) के अंतर्गत पंजीकृत है। यह संस्था डिजिटल सशक्तिकरण के प्रति पूर्णतः समर्पित है।",
     "buttons": [
       { "id": "main_menu", "title": "🏠 मुख्य मेनू" }
     ]
   },
   "sk_dev": {
-    "type": "reply",
+    "type": "button",
     "body": "हम अनुकूलित वेब अनुप्रयोग, एपीआई एकीकरण एवं क्लाउड होस्टिंग के क्षेत्र में विशिष्ट समाधान प्रदान करते हैं।",
     "buttons": [
-      { "id": "sk_portfolio", "title": "पोर्टफोलियो" },
+      { "id": "sk_portfolio", "title": "📁 पोर्टफोलियो" },
       { "id": "main_menu", "title": "🏠 मुख्य मेनू" }
     ]
   },
@@ -136,19 +143,19 @@
     "url": "https://ayus.fun"
   },
   "tools_hub": {
-    "type": "reply",
+    "type": "button",
     "body": "आयुष राज द्वारा विकसित विशिष्ट उपकरणों एवं अनुप्रयोगों की सूची यहाँ उपलब्ध है।",
     "buttons": [
       { "id": "tool_lockerkey", "title": "🔐 लॉकरकी" },
-      { "id": "tool_animation", "title": "🎮 एनीमेशन" },
+      { "id": "tool_animation", "title": "🎮 ३डी एनीमेशन" },
       { "id": "tool_crawler", "title": "🕸️ वेब क्रॉलर" }
     ]
   },
   "tool_lockerkey": {
-    "type": "reply",
+    "type": "button",
     "body": "लॉकरकी एक अत्यंत सुरक्षित पासवर्ड प्रबंधक अनुप्रयोग है जो आपके संवेदनशील डेटा को पूर्णतः एन्क्रिप्ट कर सुरक्षित रखता है।",
     "buttons": [
-      { "id": "lk_web", "title": "लॉकरकी वेब" },
+      { "id": "lk_web", "title": "🌐 लॉकरकी वेब" },
       { "id": "main_menu", "title": "🏠 मुख्य मेनू" }
     ]
   },
@@ -159,14 +166,14 @@
     "url": "https://ayus.fun"
   },
   "tool_animation": {
-    "type": "reply",
+    "type": "button",
     "body": "हम यथार्थवादी ३डी चरित्र एनीमेशन निर्मित करते हैं जो खेलों एवं अनुप्रयोगों हेतु सर्वोत्तम हैं।",
     "buttons": [
       { "id": "main_menu", "title": "🏠 मुख्य मेनू" }
     ]
   },
   "tool_crawler": {
-    "type": "reply",
+    "type": "button",
     "body": "हमारा वेब क्रॉलर टूल इंटरनेट से महत्वपूर्ण डेटा को कुशलतापूर्वक एक्सट्रैक्ट करने और उसे सुव्यवस्थित प्रारूप में प्रस्तुत करने में सक्षम है।",
     "buttons": [
       { "id": "main_menu", "title": "🏠 मुख्य मेनू" }
@@ -177,13 +184,6 @@
     "body": "प्रत्यक्ष संवाद हेतु आप हमें ईमेल भेज सकते हैं। हमारी टीम शीघ्र ही आपसे संपर्क करेगी।",
     "button_text": "📧 ईमेल भेजें",
     "url": "mailto:care@ayus.fun?subject=BaseKey%20Inquiry&body=Namaste%20Ayush,%20I%20want%20to%20know%20more%20about%20BaseKey."
-  },
-  "contact_us": {
-    "type": "reply",
-    "body": "प्रत्यक्ष संवाद स्थापित करने हेतु अधोलिखित दूरभाष संख्या का उपयोग करें:\n\n📞 +919229966001\n\nआपकी जिज्ञासाओं का निवारण हमारा परम उद्देश्य है।",
-    "buttons": [
-      { "id": "main_menu", "title": "🏠 मुख्य मेनू" }
-    ]
   },
   "main_menu": {
     "type": "list",
