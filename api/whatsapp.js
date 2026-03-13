@@ -2,9 +2,8 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, Timestamp } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import translate from 'google-translate-api-x';
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCCqWVSgULjZtgfOqVX3CBmOonxkr2UB7g",
@@ -17,35 +16,25 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// 1. Dynamic Model Selector Function
-async function getOldestStableModel() {
-  try {
-    // Ye function Gemini se available models ki list mangega
-    const result = await axios.get(`https://generativelanguage.googleapis.com/v1/models?key=${process.env.GEMINI_API_KEY}`);
-    const models = result.data.models;
-    
-    // Stable aur purane models (jaise gemini-1.0-pro) ko filter karna
-    const stableModels = models.filter(m => m.supportedGenerationMethods.includes("generateContent"));
-    
-    // Sabse purana model aksar list ke shuruat mein hota hai (Jaise Gemini 1.0 Pro)
-    return stableModels[0].name.split('/').pop() || "gemini-1.0-pro";
-  } catch (error) {
-    console.error("Model List Error:", error.message);
-    return "gemini-1.0-pro"; // Fallback agar API list na de paye
-  }
-}
 
 export default async function handler(req, res) {
   const jsonPath = path.join(process.cwd(), 'interactive-message.json');
   
+  // --- 1. META WEBHOOK VERIFICATION (GET REQUEST) ---
   if (req.method === 'GET') {
+    const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
-    if (token === 'Ayush@7859032663') return res.status(200).send(req.query['hub.challenge']);
-    return res.status(403).send('Forbidden');
+    const challenge = req.query['hub.challenge'];
+
+    if (mode === 'subscribe' && token === 'Ayush@7859032663') {
+      console.log('âœ… Webhook Verified Successfully!');
+      return res.status(200).send(challenge); 
+    } else {
+      return res.status(403).send('Forbidden');
+    }
   }
 
+  // --- 2. MESSAGE HANDLING (POST REQUEST) ---
   if (req.method === 'POST') {
     const value = req.body.entry?.[0]?.changes?.[0]?.value;
 
@@ -53,90 +42,96 @@ export default async function handler(req, res) {
       const msg = value.messages[0];
       const from = msg.from;
       const userName = value.contacts?.[0]?.profile?.name || "User";
+      
+      // DYNAMIC ID: Jis number par message aaya hai, wahi ID nikaal rahe hain
       const incoming_phone_id = value.metadata.phone_number_id; 
 
       const userRef = doc(db, "users", from);
       const userSnap = await getDoc(userRef);
-      const userData = userSnap.exists() ? userSnap.data() : { lang: 'hi', status: 'normal', lastInteraction: Timestamp.now() };
-      
-      let userLang = userData.lang || "hi";
-      let userStatus = userData.status || "normal";
-      let lastTime = userData.lastInteraction ? userData.lastInteraction.toMillis() : Date.now();
-      let currentTime = Date.now();
-      
-      let messagesDB = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-      let targetKey = null;
+      let userLang = userSnap.exists() ? userSnap.data().lang : null;
 
-      // --- 2. 5-MINUTE TIMEOUT LOGIC ---
-      // Agar user AI mode mein hai aur 5 mins (300,000 ms) se zyada ho gaye hain
-      if (userStatus === "chatting_with_ai" && (currentTime - lastTime) > 300000) {
-        userStatus = "normal";
-        await updateDoc(userRef, { status: "normal" });
-        // User ko batana ki timeout ho gaya hai
-        await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, {
-          messaging_product: "whatsapp", to: from, type: "text",
-          text: { body: "⏱️ आप 5 मिनट से निष्क्रिय थे, इसलिए आपको मुख्य मेनू पर वापस भेज दिया गया है।" }
-        }, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } });
+      let messagesDB;
+      try {
+        messagesDB = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      } catch (e) {
+        console.error("JSON Error:", e.message);
+        return res.status(200).send('OK');
       }
 
-      // --- 3. PRIORITY: AI MODE ---
-      if (msg.type === "text" && userStatus === "chatting_with_ai") {
-        try {
-          const modelName = await getOldestStableModel();
-          const aiModel = genAI.getGenerativeModel({ 
-            model: modelName,
-            systemInstruction: "You are an assistant for Ayush Raj's platforms: BaseKey, SuperKey, and LockerKey. Also help with Sanskrit grammar. Be concise." 
-          });
+      let targetKey = "welcome";
 
-          const result = await aiModel.generateContent(msg.text.body);
-          const aiText = result.response.text();
-          const transAi = await translate(aiText, { to: userLang });
-
-          await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, {
-            messaging_product: "whatsapp", to: from, type: "text",
-            text: { body: transAi.text }
-          }, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } });
-
-          // Update last interaction time
-          await updateDoc(userRef, { lastInteraction: Timestamp.now() });
-          return res.status(200).send('OK');
-        } catch (e) {
-          return res.status(200).send('OK');
-        }
-      }
-
-      // --- 4. HANDLE BUTTONS ---
+      // --- LANGUAGE SETTING LOGIC ---
       if (msg.type === 'interactive') {
         const replyId = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id;
-        
-        if (replyId === "gemini_helper") {
-          userStatus = "chatting_with_ai";
-          // User ko warning dena session limits ke baare mein
-          const warningMsg = "नमस्ते! आप जेमिनी एआई (Gemini AI) से जुड़ चुके हैं।\n\n⚠️ *ध्यान दें:* यदि आप 5 मिनट तक कोई उत्तर नहीं देंगे, तो आप स्वचालित रूप से मुख्य मेनू पर वापस चले जाएंगे।\n\nअब आप अपना प्रश्न पूछ सकते हैं:";
-          const transWarning = await translate(warningMsg, { to: userLang });
-          
-          await setDoc(userRef, { 
-            status: "chatting_with_ai", 
-            lastInteraction: Timestamp.now() 
-          }, { merge: true });
-
-          await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, {
-            messaging_product: "whatsapp", to: from, type: "text",
-            text: { body: transWarning.text }
-          }, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } });
-          
-          return res.status(200).send('OK');
-        } else {
+        if (replyId && replyId.startsWith("lang_") && !["lang_1", "lang_2", "lang_3"].includes(replyId)) {
+          userLang = replyId.split("_")[1];
+          await setDoc(userRef, { lang: userLang, name: userName }, { merge: true });
+          targetKey = "welcome"; 
+        } else if (replyId) {
           targetKey = replyId;
-          await setDoc(userRef, { status: "normal", lastInteraction: Timestamp.now() }, { merge: true });
         }
       }
 
-      // --- 5. MENU FALLBACK ---
-      if (!targetKey) targetKey = userLang ? "welcome" : "lang_1";
+      if (!userLang && !targetKey.startsWith("lang_")) targetKey = "lang_1";
+
       const currentMsg = messagesDB[targetKey] || messagesDB["welcome"];
-      // ... (Rest of your translation and payload logic)
+      const rawBody = currentMsg.body.replace("{{name}}", userName);
+      const finalLang = userLang || "hi";
+
+      try {
+        // --- DEEP TRANSLATION LOGIC ---
+        const transBody = await translate(rawBody, { to: finalLang });
+        
+        let payload = {
+          messaging_product: "whatsapp",
+          to: from,
+          type: "interactive",
+          interactive: { body: { text: transBody.text } }
+        };
+
+        if (currentMsg.type === "list") {
+          const transRows = await Promise.all(currentMsg.rows.map(async (row) => {
+            if (targetKey.startsWith("lang_")) return row; 
+            const tTitle = await translate(row.title, { to: finalLang });
+            const tDesc = await translate(row.description || "", { to: finalLang });
+            return { id: row.id, title: tTitle.text, description: tDesc.text };
+          }));
+          const tBtnLabel = await translate("Options", { to: finalLang });
+          payload.interactive.type = "list";
+          payload.interactive.action = {
+            button: tBtnLabel.text,
+            sections: [{ title: "Menu", rows: transRows }]
+          };
+        } 
+        else if (currentMsg.type === "reply" || currentMsg.buttons) {
+          const transButtons = await Promise.all(currentMsg.buttons.map(async (b) => {
+            const t = await translate(b.title, { to: finalLang });
+            return { type: "reply", reply: { id: b.id, title: t.text } };
+          }));
+          payload.interactive.type = "button";
+          payload.interactive.action = { buttons: transButtons };
+        }
+        else if (currentMsg.type === "cta_url") {
+          const tBtnText = await translate(currentMsg.button_text, { to: finalLang });
+          payload.interactive.type = "cta_url";
+          payload.interactive.action = {
+            name: "cta_url",
+            parameters: { display_text: tBtnText.text, url: currentMsg.url }
+          };
+        }
+
+        // Using dynamic incoming_phone_id for the reply
+        await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, payload, {
+          headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
+        });
+
+        return res.status(200).send('OK');
+      } catch (error) {
+        console.error('âŒ Error Processing Message:', error.message);
+        return res.status(200).send('OK');
+      }
     }
   }
+
   return res.status(200).send('OK');
 }
