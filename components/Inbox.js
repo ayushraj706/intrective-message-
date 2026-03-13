@@ -16,7 +16,7 @@ const Inbox = () => {
   const userId = auth.currentUser?.uid;
 
   // Cloudinary Config (Based on your screenshot 41980.jpg)
-  const CLOUD_NAME = "4prizfao"; // Change this if your cloud name is different
+  const CLOUD_NAME = "dprbizfao"; // Change this if your cloud name is different
   const UPLOAD_PRESET = "ayush_social"; // From your screenshot
 
   const formatTime = (timestamp) => {
