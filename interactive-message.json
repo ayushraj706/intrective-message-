@@ -44,7 +44,8 @@
       { "id": "lang_fr", "title": "French", "description": "Français" },
       { "id": "lang_es", "title": "Spanish", "description": "Español" },
       { "id": "lang_de", "title": "German", "description": "Deutsch" },
-      { "id": "lang_1", "title": "⬅️ पुनः प्रारंभ", "description": "प्रथम १० भाषाएँ" }
+      { "id": "lang_1", "title": "⬅️ पुनः प्रारंभ", "description": "प्रथम १० भाषाएँ" },
+      { "id": "lang_1", "title": "🌐 भाषा बदलें", "description": "Choose your language" }
     ]
   },
   "welcome": {
