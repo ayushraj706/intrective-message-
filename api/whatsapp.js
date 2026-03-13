@@ -6,6 +6,7 @@ import { getFirestore, doc, getDoc, setDoc, updateDoc, Timestamp } from "firebas
 import translate from 'google-translate-api-x';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Firebase Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyCCqWVSgULjZtgfOqVX3CBmOonxkr2UB7g",
   authDomain: "whatsapp-950a8.firebaseapp.com",
@@ -30,9 +31,6 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const value = req.body.entry?.[0]?.changes?.[0]?.value;
-    
-    // 1. Webhook को तुरंत जवाब देना ताकि Flooding न हो
-    res.status(200).send('OK');
 
     if (value && value.messages) {
       const msg = value.messages[0];
@@ -48,23 +46,22 @@ export default async function handler(req, res) {
       let userStatus = userData.status || "normal";
       let targetKey = null;
 
-      // --- 2. MULTIMODAL GEMINI FEATURE (Reading Photos/PDF) ---
-      // Build multimodal RAG with new Gemini Embedding.pdf]
-      if (userStatus === "chatting_with_ai" && (msg.type === "image" || msg.type === "document" || msg.type === "text")) {
-        try {
+      try {
+        // --- 1. PRIORITY: GEMINI MULTIMODAL AI (Photos/PDF/Text) ---
+        // Build multimodal RAG with new Gemini Embedding.pdf]
+        if (userStatus === "chatting_with_ai") {
           const aiModel = genAI.getGenerativeModel({ 
             model: "gemini-1.5-flash", 
-            systemInstruction: "You are an assistant for Ayush Raj's platforms. Analyze text and media carefully." 
+            systemInstruction: "You are a professional assistant for Ayush Raj's platforms: BaseKey, SuperKey, and LockerKey. Analyze text and media carefully. Be concise." 
           });
 
-          let aiParts = [msg.text?.body || "Please analyze this file."];
+          let aiParts = [msg.text?.body || "फाइल का विश्लेषण करें।"];
 
-          [span_0](start_span)[span_1](start_span)// Media Processing[span_0](end_span)[span_1](end_span)
           if (msg.type === "image" || msg.type === "document") {
             const mediaId = msg.image?.id || msg.document?.id;
             const mimeType = msg.image?.mime_type || msg.document?.mime_type;
             
-            // Meta से मीडिया डाउनलोड करना
+            // Meta se media fetch
             const mediaRes = await axios.get(`https://graph.facebook.com/v18.0/${mediaId}`, {
               headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
             });
@@ -73,9 +70,7 @@ export default async function handler(req, res) {
               responseType: 'arraybuffer'
             });
 
-            aiParts.push({
-              inlineData: { data: Buffer.from(fileData.data).toString("base64"), mimeType }
-            });
+            aiParts.push({ inlineData: { data: Buffer.from(fileData.data).toString("base64"), mimeType } });
           }
 
           const result = await aiModel.generateContent(aiParts);
@@ -91,56 +86,52 @@ export default async function handler(req, res) {
           }, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } });
 
           await updateDoc(userRef, { lastInteraction: Timestamp.now() });
-          return;
-        } catch (e) { console.error("AI Error:", e.message); return; }
-      }
-
-      // --- 3. INTERACTIVE HANDLING ---
-      if (msg.type === 'interactive') {
-        const replyId = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id;
-        if (replyId === "gemini_helper") {
-          await setDoc(userRef, { status: "chatting_with_ai", lastInteraction: Timestamp.now() }, { merge: true });
-          targetKey = "gemini_helper";
-        } else if (replyId === "main_menu") {
-          targetKey = "welcome";
-          await updateDoc(userRef, { status: "normal" });
-        } else { targetKey = replyId; }
-      } else if (msg.type === 'text') {
-        targetKey = "welcome";
-      }
-
-      // --- 4. RESPONSE BUILDER (FIXING 400 ERROR) ---
-      if (targetKey) {
-        let dbJson = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-        const currentMsg = dbJson[targetKey] || dbJson["welcome"];
-
-        // ERROR FIX: 'reply' को 'button' में बदलना
-        const apiType = (currentMsg.type === "reply") ? "button" : currentMsg.type;
-
-        const transBody = await translate(currentMsg.body.replace("{{name}}", userName), { to: userLang });
-
-        let payload = {
-          messaging_product: "whatsapp",
-          to: from,
-          type: "interactive",
-          interactive: { 
-            type: apiType, 
-            body: { text: transBody.text } 
-          }
-        };
-
-        if (apiType === "cta_url") {
-          payload.interactive.action = { name: "cta_url", parameters: { display_text: currentMsg.button_text, url: currentMsg.url } };
-        } else if (apiType === "button") {
-          payload.interactive.action = { buttons: currentMsg.buttons.map(b => ({ type: "reply", reply: b })) };
-        } else if (apiType === "list") {
-          payload.interactive.action = { button: "विकल्प", sections: [{ title: "Menu", rows: currentMsg.rows }] };
+          return res.status(200).send('OK'); 
         }
 
-        await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, payload, {
-          headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
-        });
-      }
+        // --- 2. INTERACTIVE & TEXT HANDLING ---
+        if (msg.type === 'interactive') {
+          const replyId = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id;
+          if (replyId === "gemini_helper") {
+            await setDoc(userRef, { status: "chatting_with_ai", lastInteraction: Timestamp.now() }, { merge: true });
+            targetKey = "gemini_helper";
+          } else if (replyId === "main_menu") {
+            targetKey = "welcome";
+            await updateDoc(userRef, { status: "normal" });
+          } else { targetKey = replyId; }
+        } else if (msg.type === 'text') {
+          targetKey = "welcome"; // Fallback to welcome for any text
+        }
+
+        // --- 3. DYNAMIC JSON RESPONSE BUILDER ---
+        if (targetKey) {
+          let messagesDB = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+          const currentMsg = messagesDB[targetKey] || messagesDB["welcome"];
+          
+          // Fix for Meta 400 error: 'reply' ko 'button' mein map karna
+          const apiType = (currentMsg.type === "reply" || currentMsg.type === "button") ? "button" : currentMsg.type;
+
+          const transBody = await translate(currentMsg.body.replace("{{name}}", userName), { to: userLang });
+
+          let payload = {
+            messaging_product: "whatsapp", to: from, type: "interactive",
+            interactive: { type: apiType, body: { text: transBody.text } }
+          };
+
+          if (apiType === "cta_url") {
+            payload.interactive.action = { name: "cta_url", parameters: { display_text: currentMsg.button_text, url: currentMsg.url } };
+          } else if (apiType === "button") {
+            payload.interactive.action = { buttons: currentMsg.buttons.map(b => ({ type: "reply", reply: b })) };
+          } else if (apiType === "list") {
+            payload.interactive.action = { button: "विकल्प", sections: [{ title: "Select", rows: currentMsg.rows }] };
+          }
+
+          await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, payload, {
+            headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
+          });
+        }
+      } catch (err) { console.error("Error in Handler:", err.message); }
     }
+    return res.status(200).send('OK'); // Function end mein acknowledge karega
   }
 }
