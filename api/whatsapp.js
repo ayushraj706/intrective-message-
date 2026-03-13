@@ -47,30 +47,33 @@ export default async function handler(req, res) {
       let targetKey = null;
 
       try {
-        // --- 1. PRIORITY: GEMINI MULTIMODAL AI (Photos/PDF/Text) ---
+        // --- 1. PRIORITY: GEMINI MULTIMODAL AI (Photo/PDF/Text Support) ---
         // Build multimodal RAG with new Gemini Embedding.pdf]
-        if (userStatus === "chatting_with_ai") {
+        if (userStatus === "chatting_with_ai" && (msg.type === "text" || msg.type === "image" || msg.type === "document")) {
           const aiModel = genAI.getGenerativeModel({ 
             model: "gemini-1.5-flash", 
-            systemInstruction: "You are a professional assistant for Ayush Raj's platforms: BaseKey, SuperKey, and LockerKey. Analyze text and media carefully. Be concise." 
+            systemInstruction: "You are a professional assistant for Ayush Raj's platforms: BaseKey, SuperKey, and LockerKey. Analyze media carefully and be concise." 
           });
 
-          let aiParts = [msg.text?.body || "फाइल का विश्लेषण करें।"];
+          let aiParts = [msg.text?.body || "Please analyze this file."];
 
           if (msg.type === "image" || msg.type === "document") {
             const mediaId = msg.image?.id || msg.document?.id;
             const mimeType = msg.image?.mime_type || msg.document?.mime_type;
             
-            // Meta se media fetch
+            // Meta API से मीडिया का URL प्राप्त करना
             const mediaRes = await axios.get(`https://graph.facebook.com/v18.0/${mediaId}`, {
               headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
             });
-            const fileData = await axios.get(mediaRes.data.url, {
+            // फाइल डाउनलोड करना
+            const fileBuffer = await axios.get(mediaRes.data.url, {
               headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` },
               responseType: 'arraybuffer'
             });
 
-            aiParts.push({ inlineData: { data: Buffer.from(fileData.data).toString("base64"), mimeType } });
+            aiParts.push({
+              inlineData: { data: Buffer.from(fileBuffer.data).toString("base64"), mimeType }
+            });
           }
 
           const result = await aiModel.generateContent(aiParts);
@@ -86,10 +89,10 @@ export default async function handler(req, res) {
           }, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } });
 
           await updateDoc(userRef, { lastInteraction: Timestamp.now() });
-          return res.status(200).send('OK'); 
+          return res.status(200).send('OK'); // AI रिप्लाई के बाद फंक्शन समाप्त
         }
 
-        // --- 2. INTERACTIVE & TEXT HANDLING ---
+        // --- 2. INTERACTIVE HANDLING ---
         if (msg.type === 'interactive') {
           const replyId = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id;
           if (replyId === "gemini_helper") {
@@ -100,15 +103,15 @@ export default async function handler(req, res) {
             await updateDoc(userRef, { status: "normal" });
           } else { targetKey = replyId; }
         } else if (msg.type === 'text') {
-          targetKey = "welcome"; // Fallback to welcome for any text
+          targetKey = "welcome"; 
         }
 
-        // --- 3. DYNAMIC JSON RESPONSE BUILDER ---
+        // --- 3. DYNAMIC RESPONSE BUILDER (Fixing 400 Error) ---
         if (targetKey) {
-          let messagesDB = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-          const currentMsg = messagesDB[targetKey] || messagesDB["welcome"];
-          
-          // Fix for Meta 400 error: 'reply' ko 'button' mein map karna
+          const dbJson = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+          const currentMsg = dbJson[targetKey] || dbJson["welcome"];
+
+          // ERROR FIX: 'reply' टाइप को 'button' में बदलना ताकि WhatsApp 400 एरर न दे
           const apiType = (currentMsg.type === "reply" || currentMsg.type === "button") ? "button" : currentMsg.type;
 
           const transBody = await translate(currentMsg.body.replace("{{name}}", userName), { to: userLang });
@@ -123,15 +126,18 @@ export default async function handler(req, res) {
           } else if (apiType === "button") {
             payload.interactive.action = { buttons: currentMsg.buttons.map(b => ({ type: "reply", reply: b })) };
           } else if (apiType === "list") {
-            payload.interactive.action = { button: "विकल्प", sections: [{ title: "Select", rows: currentMsg.rows }] };
+            payload.interactive.action = { button: "विकल्प", sections: [{ title: "Menu", rows: currentMsg.rows }] };
           }
 
           await axios.post(`https://graph.facebook.com/v18.0/${incoming_phone_id}/messages`, payload, {
             headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
           });
         }
-      } catch (err) { console.error("Error in Handler:", err.message); }
+      } catch (err) {
+        console.error("Handler Logic Error:", err.message);
+      }
     }
-    return res.status(200).send('OK'); // Function end mein acknowledge karega
+    // Vercel termination फिक्स: res.send को सबसे अंत में रखा गया है
+    return res.status(200).send('OK');
   }
 }
