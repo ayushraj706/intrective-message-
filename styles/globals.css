@@ -1,3 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    /* Light Mode by default */
+    @apply bg-zinc-50 text-zinc-900 transition-colors duration-300;
+  }
+  
+  /* Dark Mode specific background */
+  .dark body {
+    @apply bg-[#050505] text-white;
+  }
+}
