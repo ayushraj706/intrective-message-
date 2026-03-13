@@ -15,6 +15,7 @@ const Inbox = () => {
   const fileInputRef = useRef();
   const userId = auth.currentUser?.uid;
 
+  // Cloudinary Config - Fixed based on your screenshot
   const CLOUD_NAME = "dprbizfao"; 
   const UPLOAD_PRESET = "ayush_social";
 
@@ -40,7 +41,6 @@ const Inbox = () => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, selectedRoom]);
 
-  // --- TEXT MESSAGE LOGIC (Hamesha Chalu Hai!) ---
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!inputText.trim() || !selectedRoom) return;
@@ -48,72 +48,103 @@ const Inbox = () => {
     try {
       await axios.post('/api/send-message', { userId, to: selectedRoom, text: inputText });
       setInputText('');
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error("Text Send Error:", err); }
     setLoading(false);
   };
 
-  // --- MEDIA LOGIC ---
+  // --- Media Upload Logic (Detective Mode) ---
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || !selectedRoom) return;
+
     setFileLoading(true);
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', UPLOAD_PRESET);
 
     try {
-      const cl_res = await axios.post(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, formData);
-      await axios.post('/api/send-media', { 
-        userId, to: selectedRoom, mediaUrl: cl_res.data.secure_url, mediaType: file.type.startsWith('image') ? 'image' : 'document' 
-      });
-    } catch (err) { 
-        alert("Nahi hua bhai! Check api/send-media.js logic."); 
+      // 1. Cloudinary Upload
+      console.log("Cloudinary ko bhej rahe hain...");
+      const cl_res = await axios.post(
+        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`, 
+        formData
+      );
+      
+      const mediaUrl = cl_res.data.secure_url;
+      const mediaType = file.type.startsWith('image') ? 'image' : 'document';
+      console.log("Cloudinary Success! URL:", mediaUrl);
+
+      // 2. Meta API via Backend
+      try {
+        await axios.post('/api/send-media', { 
+          userId, to: selectedRoom, mediaUrl, mediaType 
+        });
+        alert("Photo/File WhatsApp par chali gayi! 🚀");
+      } catch (backendErr) {
+        console.error("Backend Error:", backendErr.response?.data || backendErr.message);
+        alert("Cloudinary pe toh upload ho gaya, par WhatsApp pe nahi gaya. Check api/send-media.js logic.");
+      }
+
+    } catch (clErr) { 
+      console.error("Cloudinary Detailed Error:", clErr.response?.data || clErr.message);
+      alert(`Cloudinary fail ho gaya: ${clErr.response?.data?.error?.message || clErr.message}`); 
     }
     setFileLoading(false);
   };
 
   return (
-    <div className="flex h-screen bg-white dark:bg-[#080808] overflow-hidden">
-      {/* 1. Side List */}
-      <div className={`w-full md:w-80 border-r border-zinc-200 dark:border-zinc-800 flex flex-col bg-white dark:bg-[#0a0a0a] ${selectedRoom ? 'hidden md:flex' : 'flex'}`}>
+    <div className="flex h-screen bg-white dark:bg-[#080808] overflow-hidden relative font-sans">
+      
+      {/* Sidebar List */}
+      <div className={`w-full md:w-80 border-r border-zinc-100 dark:border-zinc-800 flex flex-col bg-white dark:bg-[#0a0a0a] transition-all ${selectedRoom ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-6">
-          <h2 className="text-2xl font-black dark:text-white mb-4">Messages</h2>
-          <div className="relative">
-            <Search className="absolute left-4 top-3 text-zinc-500" size={18} />
-            <input placeholder="Search..." className="w-full bg-zinc-100 dark:bg-zinc-900 rounded-2xl py-3 pl-12 pr-4 text-sm outline-none dark:text-white" />
+          <h2 className="text-2xl font-black dark:text-white tracking-tighter mb-4">Messages</h2>
+          <div className="relative group">
+            <Search className="absolute left-4 top-3 text-zinc-500 group-focus-within:text-blue-500 transition-colors" size={18} />
+            <input placeholder="Search chat..." className="w-full bg-zinc-100 dark:bg-zinc-900 rounded-2xl py-3 pl-12 pr-4 text-sm outline-none dark:text-white border border-transparent focus:border-blue-500/20" />
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto px-2 pb-20">
           {rooms.map(num => (
             <div key={num} onClick={() => setSelectedRoom(num)}
-              className={`p-4 mx-3 mb-1 rounded-2xl flex items-center gap-4 cursor-pointer ${selectedRoom === num ? 'bg-blue-600 text-white' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900 dark:text-zinc-400'}`}>
-              <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center font-bold text-xs">{num.slice(-2)}</div>
+              className={`p-4 mb-1 rounded-2xl flex items-center gap-4 cursor-pointer transition-all ${selectedRoom === num ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900 text-zinc-900 dark:text-zinc-400'}`}>
+              <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-gray-800 flex items-center justify-center font-bold text-xs uppercase">{num.slice(-2)}</div>
               <p className="font-bold text-sm truncate">{num}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* 2. Chat Window */}
-      <div className={`flex-1 flex flex-col bg-zinc-50 dark:bg-[#050505] ${!selectedRoom ? 'hidden md:flex' : 'flex'}`}>
+      {/* Chat Area */}
+      <div className={`flex-1 flex flex-col bg-zinc-50 dark:bg-[#050505] transition-all ${!selectedRoom ? 'hidden md:flex' : 'flex'}`}>
         {selectedRoom ? (
           <>
-            <div className="px-4 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-white dark:bg-black/60 backdrop-blur-xl z-50 sticky top-0">
+            <div className="px-4 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-white/80 dark:bg-black/60 backdrop-blur-xl z-50">
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setSelectedRoom(null)} className="md:hidden p-2 text-zinc-500"><ChevronLeft size={24} /></button>
-                  <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black italic">B</div>
-                  <span className="font-bold text-base dark:text-white">{selectedRoom}</span>
+                  <button onClick={() => setSelectedRoom(null)} className="md:hidden p-2 -ml-2 text-zinc-500 hover:bg-zinc-100 rounded-full"><ChevronLeft size={24} /></button>
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black italic shadow-blue-500/20 shadow-lg">B</div>
+                  <span className="font-bold text-base dark:text-white truncate tracking-tight">{selectedRoom}</span>
                 </div>
-                <MoreVertical size={20} className="text-zinc-500" />
+                <MoreVertical size={20} className="text-zinc-500 cursor-pointer" />
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-4 pb-10">
               {messages.filter(m => m.senderNumber === selectedRoom).map((m, idx) => (
-                <div key={idx} className={`flex ${m.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                  <div className="max-w-[80%] md:max-w-[65%]">
-                    <div className={`p-4 rounded-2xl text-[14px] shadow-sm ${m.sender === 'admin' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white dark:bg-zinc-900 dark:text-zinc-200 rounded-tl-none border border-zinc-200 dark:border-zinc-800'}`}>
-                      {m.mediaType === 'image' && <img src={m.mediaUrl} alt="sent" className="rounded-lg mb-2 max-h-60 w-full object-cover" />}
-                      <p className="whitespace-pre-wrap">{m.text}</p>
+                <div key={idx} className={`flex ${m.sender === 'admin' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-1`}>
+                  <div className="max-w-[85%] md:max-w-[65%] group">
+                    <div className={`p-4 rounded-2xl text-[14px] shadow-sm leading-relaxed ${m.sender === 'admin' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white dark:bg-zinc-900 dark:text-zinc-200 rounded-tl-none border border-zinc-200/50 dark:border-gray-800'}`}>
+                      {m.mediaType === 'image' && (
+                        <div className="mb-2 overflow-hidden rounded-lg">
+                          <img src={m.mediaUrl} alt="sent" className="w-full max-h-72 object-cover hover:scale-105 transition-transform cursor-pointer" onClick={() => window.open(m.mediaUrl)} />
+                        </div>
+                      )}
+                      {m.mediaType === 'document' && (
+                        <div className="flex items-center gap-3 bg-black/10 dark:bg-white/5 p-3 rounded-xl mb-2 cursor-pointer" onClick={() => window.open(m.mediaUrl)}>
+                          <FileText size={20} className="text-blue-400" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest truncate">View Document</span>
+                        </div>
+                      )}
+                      <p className="whitespace-pre-wrap break-words">{m.text}</p>
                     </div>
                     <div className={`flex items-center gap-2 mt-1 px-1 ${m.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
                        <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">{formatTime(m.timestamp)}</span>
@@ -125,26 +156,24 @@ const Inbox = () => {
               <div ref={scrollRef} />
             </div>
 
-            {/* Final Input Bar Fix: No password icons, both text & media buttons */}
-            <div className="p-4 bg-white dark:bg-black border-t border-zinc-200 dark:border-zinc-800">
-              <form onSubmit={sendMessage} className="flex items-center gap-2 max-w-5xl mx-auto" autoComplete="off">
+            <div className="p-4 bg-white dark:bg-black border-t border-zinc-100 dark:border-zinc-800 z-50">
+              <form onSubmit={sendMessage} className="flex items-center gap-2 max-w-5xl mx-auto">
                 <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,.pdf" />
-                <button type="button" onClick={() => fileInputRef.current.click()} className="p-3 text-zinc-500">
+                <button type="button" onClick={() => fileInputRef.current.click()} className="p-3 text-zinc-500 hover:text-blue-500 transition-all active:scale-90" disabled={fileLoading}>
                   {fileLoading ? <Loader2 className="animate-spin" size={20} /> : <Paperclip size={20} />}
                 </button>
                 
                 <input 
                   type="text"
                   autoComplete="off"
-                  id="chat-field"
-                  name="chat-field"
+                  name="chat-input-ayus"
                   value={inputText} 
                   onChange={(e) => setInputText(e.target.value)} 
-                  placeholder="Type a message..." 
-                  className="flex-1 bg-zinc-100 dark:bg-zinc-900 rounded-2xl px-5 py-3 outline-none dark:text-white border border-transparent focus:border-blue-500/50 text-sm" 
+                  placeholder="Type your message..." 
+                  className="flex-1 bg-zinc-100 dark:bg-zinc-900 rounded-2xl px-6 py-3.5 outline-none dark:text-white border border-transparent focus:border-blue-500/20 text-sm transition-all" 
                 />
                 
-                <button disabled={loading} className="bg-blue-600 p-3.5 rounded-2xl text-white">
+                <button disabled={loading || fileLoading} className="bg-blue-600 hover:bg-blue-500 p-3.5 rounded-2xl text-white transition-all shadow-lg active:scale-95 shadow-blue-600/20 disabled:opacity-50">
                   {loading ? <Loader2 className="animate-spin" size={20}/> : <Send size={20} />}
                 </button>
               </form>
@@ -152,9 +181,11 @@ const Inbox = () => {
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 p-10 text-center">
-            <MessageSquare size={32} className="opacity-20 mb-4" />
-            <h3 className="text-lg font-bold">BaseKey Inbox</h3>
-            <p className="text-xs">Select a chat to see the logic in action.</p>
+            <div className="w-20 h-20 bg-zinc-100 dark:bg-zinc-900 rounded-3xl flex items-center justify-center mb-6 border border-zinc-200 dark:border-zinc-800 transition-all hover:scale-110">
+                <MessageSquare size={32} className="opacity-20 text-blue-500" />
+            </div>
+            <h3 className="text-lg font-bold dark:text-white mb-2">BaseKey Messages</h3>
+            <p className="text-xs max-w-xs leading-relaxed font-medium">Select a conversation from the sidebar to start chatting.</p>
           </div>
         )}
       </div>
