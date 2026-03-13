@@ -16,30 +16,65 @@ const db = getFirestore(app);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  const { userId, to, mediaUrl, mediaType } = req.body;
+
+  const { userId, to, text } = req.body;
+
+  // Check if data is missing
+  if (!userId || !to || !text) {
+    console.error("Missing fields:", { userId, to, text });
+    return res.status(400).json({ error: "Missing required fields" });
+  }
 
   try {
-    const configSnap = await getDoc(doc(db, "configs", userId));
+    // 1. Get User Config from Firestore
+    const configRef = doc(db, "configs", userId);
+    const configSnap = await getDoc(configRef);
+
+    if (!configSnap.exists()) {
+      console.error(`Config not found for userId: ${userId}`);
+      return res.status(404).json({ error: "User configuration not found in Firestore" });
+    }
+
     const { accessToken, phoneId } = configSnap.data();
 
-    await axios.post(`https://graph.facebook.com/v18.0/${phoneId}/messages`, {
-      messaging_product: "whatsapp",
-      to: to,
-      type: mediaType,
-      [mediaType]: { link: mediaUrl }
-    }, { headers: { Authorization: `Bearer ${accessToken}` } });
+    // 2. Call Meta API
+    console.log(`Sending message to ${to} using PhoneID ${phoneId}...`);
+    
+    const metaRes = await axios.post(
+      `https://graph.facebook.com/v18.0/${phoneId}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to: to,
+        type: "text",
+        text: { body: text }
+      },
+      { 
+        headers: { 
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        } 
+      }
+    );
 
+    // 3. Save to History
     await addDoc(collection(db, "users", userId, "messages"), {
-      text: mediaType === 'image' ? "📷 Photo" : "📄 File", // टेक्स्ट यहाँ भी है!
-      mediaUrl,
-      mediaType,
-      sender: 'admin',
+      text: text,
+      sender: 'admin', 
       senderNumber: to,
       timestamp: serverTimestamp(),
     });
 
+    console.log("Message sent successfully!");
     return res.status(200).json({ success: true });
+
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    // Ye line 500 error ko pakad legi aur detail batayegi
+    const errorDetail = error.response?.data || error.message;
+    console.error("CRITICAL ERROR in send-message:", JSON.stringify(errorDetail, null, 2));
+    
+    return res.status(500).json({ 
+      error: "Internal Server Error", 
+      details: errorDetail 
+    });
   }
 }
