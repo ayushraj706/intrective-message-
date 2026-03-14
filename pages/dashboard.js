@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import MainDashboard from '../components/MainDashboard';
 import AIIntegration from '../components/setup/AIIntegration';
-import Contacts from '../components/Contacts'; // <-- हमने इसे 'components' में रखा है
+import Contacts from '../components/Contacts';
 import dynamic from 'next/dynamic';
 import { auth } from '../firebase';
 import { useRouter } from 'next/router';
 import { Menu } from 'lucide-react';
 
+// 1. Inbox और FlowBuilder को डायनामिक इंपोर्ट करें (SSR False के साथ)
 const Inbox = dynamic(() => import('../components/Inbox'), { ssr: false });
+const FlowBuilder = dynamic(() => import('../components/FlowBuilder'), { ssr: false });
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -51,18 +53,19 @@ export default function Dashboard() {
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-zinc-500">
             <Menu size={24} />
           </button>
-          <span className="font-black text-lg tracking-tighter text-blue-600 italic">BaseKey</span>
+          <span className="font-black text-lg tracking-tighter text-blue-600 italic uppercase">BaseKey</span>
           <div className="w-10"></div>
         </div>
 
-        {/* Tab Content (यहाँ असली स्विचिंग हो रही है) */}
+        {/* Tab Content (यहाँ हमने 'flow' को जोड़ दिया है) */}
         <div className="flex-1 overflow-hidden relative">
           {activeTab === 'dashboard' && <MainDashboard />}
           {activeTab === 'inbox' && <Inbox />}
           {activeTab === 'integration' && <AIIntegration onBack={() => setActiveTab('dashboard')} />}
-          
-          {/* अब यहाँ 'Contacts' वाला असली पेज खुलेगा */}
           {activeTab === 'contacts' && <Contacts />}
+          
+          {/* 2. जब 'flow' टैब एक्टिव हो, तब FlowBuilder दिखेगा */}
+          {activeTab === 'flow' && <FlowBuilder />}
         </div>
       </main>
     </div>
