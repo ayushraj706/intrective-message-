@@ -1,111 +1,102 @@
 import React from 'react';
-import { X, Type, Link, Trash2, MessageSquarePlus } from 'lucide-react';
+import { X, Type, Link, Trash2, Plus } from 'lucide-react';
 
 const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
   if (!selectedNode) return null;
-
   const blocks = selectedNode.data.blocks || [];
 
-  // Block Update Handler
-  const updateBlock = (blockId, key, value) => {
-    const updatedBlocks = blocks.map(b => 
-      b.id === blockId ? { ...b, [key]: value } : b
-    );
-    onUpdate(selectedNode.id, updatedBlocks);
-  };
-
-  // Add New Block Handler
-  const addBlock = (type, subType = null) => {
+  // Naya element add karne ka logic
+  const addBlock = (type, subType = 'reply') => {
     const newBlock = { 
       id: `blk_${Date.now()}`, 
       type, 
-      ...(type === 'text' ? { content: '' } : { subType, label: 'New Button' })
+      subType, 
+      label: subType === 'url' ? 'Open Website' : 'Click Me',
+      url: subType === 'url' ? 'https://' : '' // Sirf URL type ke liye
     };
     onUpdate(selectedNode.id, [...blocks, newBlock]);
   };
 
-  // Remove Block Handler
-  const removeBlock = (blockId) => {
-    const updatedBlocks = blocks.filter(b => b.id !== blockId);
-    onUpdate(selectedNode.id, updatedBlocks);
+  const updateBlock = (id, field, value) => {
+    const newBlocks = blocks.map(b => b.id === id ? { ...b, [field]: value } : b);
+    onUpdate(selectedNode.id, newBlocks);
+  };
+
+  const removeBlock = (id) => {
+    onUpdate(selectedNode.id, blocks.filter(b => b.id !== id));
   };
 
   return (
-    <div className="w-80 bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 h-full p-6 shadow-2xl overflow-y-auto animate-in slide-in-from-right duration-300 z-[100]">
+    <div className="w-80 bg-white border-l border-slate-200 h-full p-6 shadow-2xl overflow-y-auto z-[100]">
       <div className="flex items-center justify-between mb-8">
-        <h3 className="text-lg font-black dark:text-white italic">Settings</h3>
-        <button onClick={onClose} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full">
-          <X size={20} className="text-zinc-500" />
-        </button>
+        <h3 className="text-lg font-bold text-slate-800 italic">Settings</h3>
+        <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} /></button>
       </div>
 
       <div className="space-y-6">
-        {/* Render Editors for Each Block */}
-        {blocks.map((block, index) => (
-          <div key={block.id} className="relative bg-zinc-50 dark:bg-black/50 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800">
-            <button 
-              onClick={() => removeBlock(block.id)}
-              className="absolute top-2 right-2 text-zinc-400 hover:text-red-500"
-            >
+        {blocks.map((block, idx) => (
+          <div key={block.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 relative group">
+            <button onClick={() => removeBlock(block.id)} className="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
               <Trash2 size={14} />
             </button>
 
             {block.type === 'text' ? (
-              <div>
-                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block mb-2">Message Text {index + 1}</label>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Message Text {idx + 1}</label>
                 <textarea 
                   value={block.content}
                   onChange={(e) => updateBlock(block.id, 'content', e.target.value)}
-                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs dark:text-white outline-none focus:border-blue-500 transition-all min-h-[80px]"
-                  placeholder="What should the bot say?"
+                  className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs outline-none focus:border-indigo-500 min-h-[80px]"
                 />
               </div>
             ) : (
-              <div>
-                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block mb-2">
-                  {block.subType === 'url' ? 'URL Button' : 'Quick Reply Button'}
+              <div className="space-y-3">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  {block.subType === 'url' ? '🔗 URL Link Button' : '🔘 Quick Reply Button'}
                 </label>
                 <input 
-                  type="text"
-                  value={block.label}
+                  type="text" 
+                  value={block.label} 
+                  placeholder="Button Display Name"
                   onChange={(e) => updateBlock(block.id, 'label', e.target.value)}
-                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs dark:text-white outline-none focus:border-blue-500 transition-all"
-                  placeholder="Button Label"
+                  className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs outline-none"
                 />
+                {block.subType === 'url' && (
+                  <input 
+                    type="text" 
+                    value={block.url} 
+                    placeholder="https://example.com"
+                    onChange={(e) => updateBlock(block.id, 'url', e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl p-3 text-[10px] font-mono outline-none text-indigo-500"
+                  />
+                )}
               </div>
             )}
           </div>
         ))}
 
-        {/* Action Controls to Add New Elements */}
-        <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
-          <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block mb-3">Add Elements</label>
-          <div className="grid grid-cols-2 gap-2 mb-2">
-            <button onClick={() => addBlock('button', 'reply')} className="flex items-center justify-center gap-2 p-3 bg-blue-600/10 text-blue-600 dark:text-blue-400 rounded-xl text-[10px] font-bold hover:bg-blue-600/20">
-              <Type size={14} /> Quick Reply
+        <div className="pt-4 border-t border-slate-100 space-y-2">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Add Elements</label>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => addBlock('button', 'reply')} className="flex items-center justify-center gap-2 p-3 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-bold hover:bg-indigo-100 transition-all">
+              <Type size={14} /> + Quick Reply
             </button>
-            <button onClick={() => addBlock('button', 'url')} className="flex items-center justify-center gap-2 p-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-300 rounded-xl text-[10px] font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700">
-              <Link size={14} /> URL Link
+            <button onClick={() => addBlock('button', 'url')} className="flex items-center justify-center gap-2 p-3 bg-slate-50 text-slate-600 rounded-xl text-[10px] font-bold hover:bg-slate-100 transition-all">
+              <Link size={14} /> + URL Link
             </button>
           </div>
-          <button onClick={() => addBlock('text')} className="w-full flex items-center justify-center gap-2 p-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-300 rounded-xl text-[10px] font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700">
-            <MessageSquarePlus size={14} /> Add Text Block
+          <button onClick={() => addBlock('text')} className="w-full p-3 bg-slate-50 text-slate-400 rounded-xl text-[10px] font-bold border-2 border-dashed border-slate-200 hover:border-indigo-200 hover:text-indigo-400 transition-all">
+            + Add Text Block
           </button>
         </div>
 
-        {/* Delete Entire Node */}
-        <div className="pt-8">
-          <button 
-            onClick={() => onDelete(selectedNode.id)}
-            className="w-full flex items-center justify-center gap-2 p-4 bg-red-500/10 text-red-500 rounded-2xl text-xs font-black hover:bg-red-500 hover:text-white transition-all"
-          >
-            <Trash2 size={16} /> Delete Entire Message
-          </button>
-        </div>
+        <button onClick={() => onDelete(selectedNode.id)} className="w-full mt-8 p-4 bg-red-50 text-red-500 rounded-2xl text-[11px] font-bold hover:bg-red-500 hover:text-white transition-all">
+          <Trash2 size={16} className="inline mr-2" /> Delete Entire Message
+        </button>
       </div>
     </div>
   );
 };
 
 export default PropertiesPanel;
-          
+                      
