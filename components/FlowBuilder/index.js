@@ -1,63 +1,50 @@
-import React, { useState, useCallback, useRef } from 'react';
-import ReactFlow, { ReactFlowProvider, addEdge, Background, Controls } from 'reactflow';
-import WhatsAppNode from './WhatsAppNode';
-import FlowSidebar from './Sidebar';
-
-const nodeTypes = { whatsappNode: WhatsAppNode };
+// ... पुराने इंपोर्ट्स के साथ PropertiesPanel जोड़ें
+import PropertiesPanel from './PropertiesPanel';
 
 const FlowBuilder = () => {
-  const reactFlowWrapper = useRef(null);
-  const [nodes, setNodes] = useState([]);
-  const [edges, setEdges] = useState([]);
-  const [reactFlowInstance, setReactFlowInstance] = useState(null);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [selectedNode, setSelectedNode] = useState(null);
 
-  const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), []);
+  // नोड पर क्लिक करने का लॉजिक
+  const onNodeClick = (event, node) => setSelectedNode(node);
 
-  const onDrop = useCallback(
-    (event) => {
-      event.preventDefault();
-      const type = event.dataTransfer.getData('application/reactflow');
-      if (!type) return;
-
-      const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
-
-      const newNode = {
-        id: `node_${Date.now()}`,
-        type,
-        position,
-        data: { blocks: [{ type: 'text', content: 'Hello! Type here' }] },
-      };
-
-      setNodes((nds) => nds.concat(newNode));
-    },
-    [reactFlowInstance]
-  );
+  // टेक्स्ट अपडेट करने का लॉजिक
+  const updateNodeLabel = (nodeId, newLabel) => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === nodeId) {
+          return { ...node, data: { ...node.data, label: newLabel } };
+        }
+        return node;
+      })
+    );
+  };
 
   return (
     <div className="flex h-screen bg-zinc-50 dark:bg-[#050505]">
-      <ReactFlowProvider>
-        <FlowSidebar />
-        <div className="flex-1 relative" ref={reactFlowWrapper}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onConnect={onConnect}
-            onInit={setReactFlowInstance}
-            onDrop={onDrop}
-            onDragOver={(e) => e.preventDefault()}
-            nodeTypes={nodeTypes}
-            fitView
-          >
-            <Background variant="dots" gap={25} color="#333" />
-            <Controls />
-          </ReactFlow>
-        </div>
-      </ReactFlowProvider>
+      <FlowSidebar />
+      <div className="flex-1 relative">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={onNodeClick} // <-- क्लिक इवेंट
+          nodeTypes={nodeTypes}
+          // ... बाकी पुराना कोड
+        >
+          <Background variant="dots" color="#333" />
+        </ReactFlow>
+      </div>
+      
+      {/* राईट साइड वाला प्रॉपर्टी पैनल */}
+      <PropertiesPanel 
+        selectedNode={selectedNode}
+        onUpdate={updateNodeLabel}
+        onDelete={(id) => setNodes((nds) => nds.filter(n => n.id !== id))}
+        onClose={() => setSelectedNode(null)}
+      />
     </div>
   );
 };
-
-export default FlowBuilder;
