@@ -5,7 +5,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { Save, Loader2 } from 'lucide-react';
 
-// Firebase Firestore logic
+// Firebase Logic
 import { db, auth } from '../../firebase'; 
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
@@ -24,34 +24,28 @@ const FlowBuilder = () => {
   const [selectedNode, setSelectedNode] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 1. Firebase Load: Page khulte hi purana flow wapas aayega
+  // 1. Firebase Load logic
   useEffect(() => {
     const loadFlow = async () => {
       if (!auth.currentUser) return;
-      const docRef = doc(db, "users", auth.currentUser.uid, "flows", "main_flow");
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const { flowData } = docSnap.data();
-        if (flowData) {
-          setNodes(flowData.nodes || []);
-          setEdges(flowData.edges || []);
+      try {
+        const docRef = doc(db, "users", auth.currentUser.uid, "flows", "main_flow");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const { flowData } = docSnap.data();
+          if (flowData) {
+            setNodes(flowData.nodes || []);
+            setEdges(flowData.edges || []);
+          }
         }
-      } else {
-        setNodes([
-          { id: 'start_1', type: 'startNode', position: { x: 50, y: 200 }, data: {} },
-          { id: 'node_1', type: 'whatsappNode', position: { x: 250, y: 150 }, 
-            data: { title: 'Message 1', blocks: [{ id: 'b1', type: 'text', content: 'Welcome!' }] } 
-          },
-        ]);
-      }
+      } catch (e) { console.error("Load error:", e); }
     };
     loadFlow();
   }, [auth.currentUser, setNodes, setEdges]);
 
-  // 2. Add New Node Logic: Click aur Drag dono ke liye
+  // 2. Add Node function
   const addNewNode = useCallback((type, position = null) => {
     const spawnPos = position || { x: Math.random() * 300 + 100, y: Math.random() * 300 + 100 };
-    // Sequential Naming
     const count = nodes.filter(n => n.type === 'whatsappNode').length;
     
     const newNode = {
@@ -66,13 +60,13 @@ const FlowBuilder = () => {
     setNodes((nds) => nds.concat(newNode));
   }, [nodes, setNodes]);
 
-  // 3. Sync Logic: Real-time update for Panel and Canvas
+  // 3. REAL-TIME SYNC LOGIC: Panel aur Canvas ko jodta hai
   const updateNodeData = (nodeId, newBlocks) => {
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === nodeId) {
           const updatedNode = { ...node, data: { ...node.data, blocks: newBlocks } };
-          // Panel sync: Jab dabba update ho, toh selected state bhi update ho
+          // IMPORTANT: selectedNode ko bhi update karna zaroori hai sync ke liye
           if (selectedNode?.id === nodeId) setSelectedNode(updatedNode);
           return updatedNode;
         }
@@ -89,7 +83,7 @@ const FlowBuilder = () => {
       await setDoc(doc(db, "users", auth.currentUser.uid, "flows", "main_flow"), {
         flowData, updatedAt: new Date().toISOString()
       });
-      alert("Flow Saved Successfully!");
+      alert("Flow Saved!");
     } catch (e) { alert("Save failed"); }
     setIsSaving(false);
   };
@@ -100,7 +94,7 @@ const FlowBuilder = () => {
         <FlowSidebar onAddNode={(type) => addNewNode(type)} /> 
 
         <div className="flex-1 relative" ref={reactFlowWrapper}>
-          <button onClick={saveFlow} disabled={isSaving} className="absolute top-4 right-4 z-[50] flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-full font-bold shadow-lg hover:bg-indigo-700 transition-all">
+          <button onClick={saveFlow} disabled={isSaving} className="absolute top-4 right-4 z-[50] flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-full font-bold shadow-lg hover:bg-indigo-700 transition-all">
             {isSaving ? <Loader2 className="animate-spin" size={16}/> : <Save size={16}/>} Save Flow
           </button>
 
@@ -119,14 +113,15 @@ const FlowBuilder = () => {
             onPaneClick={() => setSelectedNode(null)}
             nodeTypes={nodeTypes} fitView snapToGrid={true}
           >
-            <Background variant="dots" gap={20} color="#E2E8F0" />
-            <Controls />
+            <Background variant="dots" gap={20} size={1} color="#E2E8F0" />
+            <Controls className="bg-white border-none shadow-md" />
           </ReactFlow>
         </div>
+        
         {selectedNode && (
           <PropertiesPanel 
             selectedNode={selectedNode} 
-            onUpdate={updateNodeData} // Pass the specialized sync function
+            onUpdate={updateNodeData} 
             onDelete={(id) => { setNodes(nds => nds.filter(n => n.id !== id)); setSelectedNode(null); }}
             onClose={() => setSelectedNode(null)}
           />
@@ -137,4 +132,4 @@ const FlowBuilder = () => {
 };
 
 export default FlowBuilder;
-  
+              
