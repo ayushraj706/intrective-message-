@@ -1,66 +1,60 @@
 import React from 'react';
 import { Handle, Position } from 'reactflow';
-import { MessageSquare, ExternalLink, Reply } from 'lucide-react';
+import { Send, GripVertical, Plus } from 'lucide-react';
 
-const WhatsAppNode = ({ data, isConnectable }) => {
+const WhatsAppNode = ({ data }) => {
   const blocks = data?.blocks || [];
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border-2 border-blue-600 rounded-[2rem] shadow-2xl w-80 overflow-hidden ring-4 ring-black/5 dark:ring-white/5 relative">
-      
-      {/* Target Handle (Left side - Incoming messages) */}
-      <Handle 
-        type="target" 
-        position={Position.Left} 
-        isConnectable={isConnectable}
-        className="w-4 h-4 bg-zinc-400 border-4 border-white dark:border-zinc-900 -left-2 top-10" 
-      />
+    <div className="bg-white border-[1px] border-slate-200 rounded-2xl shadow-sm w-72 overflow-hidden font-sans">
+      {/* Target Handle - Left Side */}
+      <Handle type="target" position={Position.Left} className="w-3 h-3 bg-slate-300 border-2 border-white" />
 
-      {/* Default Source Handle (Right side - If user just wants to connect the whole node) */}
-      <Handle 
-        type="source" 
-        position={Position.Right} 
-        id="default"
-        isConnectable={isConnectable}
-        className="w-4 h-4 bg-zinc-400 border-4 border-white dark:border-zinc-900 -right-2 top-10" 
-      />
-
-      {/* Header */}
-      <div className="bg-blue-600 p-4 flex items-center justify-between text-white">
-        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em]">
-          <MessageSquare size={14} /> WhatsApp Message
+      {/* Header Area */}
+      <div className="flex items-center justify-between p-3 border-b border-slate-50">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-500">
+            <Send size={14} />
+          </div>
+          <span className="text-[11px] font-semibold text-slate-500 tracking-tight uppercase">Message</span>
         </div>
+        <GripVertical size={16} className="text-slate-300 cursor-grab" />
       </div>
 
-      <div className="p-5 space-y-4">
-        {blocks.length > 0 ? blocks.map((block) => (
-          <div key={block.id} className="relative group">
+      {/* Body Area */}
+      <div className="p-4 space-y-3">
+        {blocks.map((block) => (
+          <div key={block.id}>
             {block.type === 'text' && (
-              <div className="bg-zinc-100 dark:bg-black p-4 rounded-2xl text-[13px] dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800 font-medium whitespace-pre-wrap">
-                {block.content || "Click to edit text..."}
+              <div className="p-3 bg-white border border-slate-100 rounded-xl text-xs text-slate-600 leading-relaxed shadow-sm">
+                {block.content || "Write your message..."}
               </div>
             )}
 
             {block.type === 'button' && (
               <div className="relative mt-2">
-                <div className="flex items-center gap-3 bg-blue-600/5 dark:bg-blue-600/10 border-2 border-blue-500/20 text-blue-600 dark:text-blue-400 p-3.5 rounded-2xl text-[11px] font-black justify-center tracking-wider">
-                  {block.subType === 'url' ? <ExternalLink size={14} /> : <Reply size={14} />}
-                  {block.label || "New Button"}
+                <div className="w-full py-2.5 px-4 bg-white border border-slate-200 text-indigo-600 rounded-full text-[11px] font-medium text-center shadow-sm">
+                  {block.label}
                 </div>
-                {/* Individual Source Handle for Button Routing */}
-                <Handle 
-                  type="source" 
-                  position={Position.Right} 
-                  id={block.id} 
-                  isConnectable={isConnectable}
-                  className="w-4 h-4 bg-blue-600 border-2 border-white dark:border-zinc-900 -right-7" 
-                />
+                {/* Source Handle - Only for Buttons */}
+                {block.subType === 'reply' && (
+                  <Handle 
+                    type="source" 
+                    position={Position.Right} 
+                    id={block.id} 
+                    className="w-3 h-3 bg-indigo-500 border-2 border-white -right-4" 
+                  />
+                )}
               </div>
             )}
           </div>
-        )) : (
-          <p className="text-[10px] text-zinc-400 text-center italic">Empty Message Tile</p>
-        )}
+        ))}
+
+        {/* Add Button Placeholder (Visual Only) */}
+        <div className="mt-2 py-2 border-2 border-dashed border-slate-100 rounded-full flex items-center justify-center gap-2 text-slate-300 group hover:border-indigo-200 hover:text-indigo-400 transition-all cursor-pointer">
+          <Plus size={14} />
+          <span className="text-[10px] font-bold uppercase tracking-wider">Add Button</span>
+        </div>
       </div>
     </div>
   );
