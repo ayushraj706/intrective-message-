@@ -3,7 +3,7 @@ import { Users, Search, Smartphone, FileText, Loader2, Plus, ArrowRight, Trash2,
 import { db, auth } from '../firebase'; 
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-// WhatsApp Logo SVG (As seen in your photo)
+// WhatsApp Logo SVG
 const WhatsAppIcon = () => (
   <svg viewBox="0 0 24 24" width="18" height="18" fill="#25D366" xmlns="http://www.w3.org/2000/svg">
     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.72.937 3.659 1.432 5.631 1.433h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
@@ -16,7 +16,7 @@ const Contacts = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const user = auth.currentUser;
 
-  // 1. क्लाउड से डेटा लोड करना (With Error Handling)
+  // 1. Firebase से डेटा लोड करना और पुराने डेटा को ठीक करना
   useEffect(() => {
     const fetchFromCloud = async () => {
       if (user) {
@@ -25,29 +25,31 @@ const Contacts = () => {
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             const rawData = docSnap.data().numbers || [];
-            // पुराने डेटा (String) को नए फॉर्मेट (Object) में बदलना
+            // एरर से बचने के लिए: अगर डेटा स्ट्रिंग है तो उसे ऑब्जेक्ट बना दो
             const formattedData = rawData.map(item => 
               typeof item === 'string' ? { number: item, isWhatsApp: true } : item
             );
             setExtractedContacts(formattedData);
           }
-        } catch (err) {
-          console.error("Cloud Load Error:", err);
-        }
+        } catch (err) { console.error(err); }
       }
     };
     fetchFromCloud();
   }, [user]);
 
-  // 2. Firebase में सिंक करना
+  // 2. Firebase Sync
   const syncToCloud = async (numbers) => {
     if (!user) return;
     try {
       const docRef = doc(db, "users", user.uid, "contacts", "list");
       await setDoc(docRef, { numbers, updatedAt: new Date().toISOString() }, { merge: true });
-    } catch (err) {
-      console.error("Cloud Sync Error:", err);
-    }
+    } catch (err) { console.error(err); }
+  };
+
+  // 3. मैसेज भेजने का फंक्शन (WhatsApp Open)
+  const handleMessage = (number) => {
+    const cleanNumber = number.replace(/\D/g, ''); // सिर्फ नंबर निकालना
+    window.open(`https://wa.me/${cleanNumber}`, '_blank');
   };
 
   const handleFileUpload = (e) => {
@@ -78,7 +80,7 @@ const Contacts = () => {
           let cleanPhone = phone.replace(/[^0-9]/g, '').trim();
           if (cleanPhone.length >= 10) {
             const num = '+' + cleanPhone;
-            // सिर्फ नए नंबर्स जोड़ना
+            // सारे नंबर्स को शामिल करें
             if (!extractedContacts.some(c => c.number === num)) {
               newNumbers.push({ number: num, isWhatsApp: true }); 
             }
@@ -90,7 +92,7 @@ const Contacts = () => {
       setExtractedContacts(updatedList);
       await syncToCloud(updatedList);
       setIsUploading(false);
-      alert(`${newNumbers.length} नए नंबर्स प्रोसेस हो गए! ✅`);
+      alert(`${newNumbers.length} नंबर्स लोड हो गए! ✅`);
     };
     reader.readAsText(file);
   };
@@ -113,45 +115,45 @@ const Contacts = () => {
   );
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#050505] p-6 md:p-10 font-sans">
+    <div className="min-h-screen bg-white dark:bg-[#050505] p-6 md:p-10 font-sans transition-colors duration-300">
       <div className="max-w-6xl mx-auto">
         
-        {/* Header Section with WhatsApp Plus Icon Style */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
           <div>
             <h1 className="text-5xl font-black tracking-tighter dark:text-white italic uppercase">BaseKey Cloud</h1>
-            <p className="text-zinc-500 text-sm mt-2 font-medium">WhatsApp Cloud Database.</p>
+            <p className="text-zinc-500 text-sm mt-2 font-medium">Manage all your contacts in one place.</p>
           </div>
           
           <div className="flex items-center gap-4">
             {extractedContacts.length > 0 && (
-              <button onClick={clearAllContacts} className="p-4 rounded-full bg-zinc-100 dark:bg-zinc-800 text-red-500 hover:bg-red-50 transition-all shadow-sm">
-                <RotateCcw size={24} />
+              <button 
+                onClick={clearAllContacts} 
+                className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-red-50 dark:bg-red-500/10 text-red-500 font-bold hover:bg-red-100 transition-all shadow-sm"
+              >
+                <RotateCcw size={20} />
+                <span className="hidden sm:inline">Clear List</span>
               </button>
             )}
             
-            {/* WhatsApp Style Rounded Plus Button */}
             <label className="group flex items-center justify-center w-16 h-16 bg-blue-600 hover:bg-blue-500 text-white rounded-full cursor-pointer transition-all shadow-xl shadow-blue-600/30 active:scale-90">
-              {isUploading ? <Loader2 className="animate-spin" size={28} /> : <Plus size={32} />}
-              <input 
-                type="file" 
-                className="hidden" 
-                onChange={handleFileUpload} 
-                accept=".csv, text/csv, application/vnd.ms-excel, text/plain" // Fix for dark files
-              />
+              {isUploading ? <Loader2 className="animate-spin" size={28} /> : <Plus size={32} className="group-hover:rotate-90 transition-transform" />}
+              <input type="file" className="hidden" onChange={handleFileUpload} accept=".csv, text/csv, application/vnd.ms-excel, text/plain" />
             </label>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Stats Card */}
           <div className="bg-white dark:bg-zinc-900/50 p-8 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm h-fit">
             <div className="w-14 h-14 bg-blue-100 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center text-blue-600 mb-6">
               <Users size={28} />
             </div>
-            <p className="text-zinc-500 text-xs font-bold uppercase tracking-[0.2em]">Verified List</p>
+            <p className="text-zinc-500 text-xs font-bold uppercase tracking-[0.2em]">All Contacts</p>
             <h3 className="text-5xl font-black dark:text-white mt-2">{extractedContacts.length}</h3>
           </div>
 
+          {/* List Card */}
           <div className="lg:col-span-2 bg-white dark:bg-zinc-900/50 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
             <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/80 backdrop-blur-md">
               <div className="relative w-full">
@@ -173,7 +175,7 @@ const Contacts = () => {
                       <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-blue-500 transition-colors">
                         <Smartphone size={20} />
                       </div>
-                      {/* Logo only for WhatsApp active numbers */}
+                      {/* WhatsApp Logo */}
                       {contact.isWhatsApp && (
                         <div className="absolute -top-1 -right-1 bg-white dark:bg-[#050505] rounded-full p-0.5 shadow-sm">
                           <WhatsAppIcon />
@@ -182,7 +184,6 @@ const Contacts = () => {
                     </div>
                     <div>
                       <p className="font-bold text-sm dark:text-zinc-200 tracking-tight">{contact.number}</p>
-                      {contact.isWhatsApp && <p className="text-[10px] text-green-500 font-bold uppercase">WhatsApp Active</p>}
                     </div>
                   </div>
                   
@@ -193,7 +194,10 @@ const Contacts = () => {
                     >
                       <Trash2 size={20} />
                     </button>
-                    <button className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/20">
+                    <button 
+                      onClick={() => handleMessage(contact.number)}
+                      className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+                    >
                       Message <ArrowRight size={14} />
                     </button>
                   </div>
@@ -213,4 +217,4 @@ const Contacts = () => {
 };
 
 export default Contacts;
-        
+    
