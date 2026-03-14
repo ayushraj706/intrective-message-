@@ -9,22 +9,20 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-// पाथ फिक्स: दो फोल्डर बाहर (root) में firebase.js है
+// Firebase imports retained
 import { db, auth } from '../../firebase'; 
 import WhatsAppNode from './WhatsAppNode';
 import FlowSidebar from './Sidebar';
 import PropertiesPanel from './PropertiesPanel';
 
-// कस्टम नोड रजिस्टर करना
 const nodeTypes = { whatsappNode: WhatsAppNode };
 
-// शुरुआती डेटा
 const initialNodes = [
   { 
     id: 'node_1', 
     type: 'whatsappNode', 
     position: { x: 250, y: 100 }, 
-    data: { blocks: [{ type: 'text', content: 'Welcome to BaseKey!' }] } 
+    data: { blocks: [{ id: 'blk_1', type: 'text', content: 'Welcome to BaseKey!' }] } 
   },
 ];
 
@@ -35,10 +33,10 @@ const FlowBuilder = () => {
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
 
-  // 1. कनेक्शन लॉजिक (तार जोड़ना)
+  // 1. Connection Logic (Connecting nodes & buttons)
   const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
-  // 2. ड्रैग एंड ड्रॉप लॉजिक (वीडियो फिक्स)
+  // 2. Drag & Drop Logic
   const onDragOver = useCallback((event) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
@@ -57,9 +55,9 @@ const FlowBuilder = () => {
 
       const newNode = {
         id: `node_${Date.now()}`,
-        type: 'whatsappNode', // हमेशा व्हाट्सएप स्टाइल नोड बनेगा
+        type: 'whatsappNode',
         position,
-        data: { blocks: [{ type: 'text', content: 'New Message' }] },
+        data: { blocks: [{ id: `blk_${Date.now()}`, type: 'text', content: 'New Message' }] },
       };
 
       setNodes((nds) => nds.concat(newNode));
@@ -67,12 +65,15 @@ const FlowBuilder = () => {
     [reactFlowInstance, setNodes]
   );
 
-  // 3. अपडेट लॉजिक (Properties Panel के लिए)
+  // 3. Update Node Data Logic (For Properties Panel)
   const updateNodeData = (nodeId, newBlocks) => {
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === nodeId) {
-          return { ...node, data: { ...node.data, blocks: newBlocks } };
+          const updatedNode = { ...node, data: { ...node.data, blocks: newBlocks } };
+          // Agar selected node update ho raha hai, toh panel ko bhi sync karein
+          if (selectedNode?.id === nodeId) setSelectedNode(updatedNode);
+          return updatedNode;
         }
         return node;
       })
@@ -82,7 +83,6 @@ const FlowBuilder = () => {
   return (
     <div className="flex h-screen bg-zinc-50 dark:bg-[#050505]">
       <ReactFlowProvider>
-        {/* बाएँ तरफ वाला मेनू */}
         <FlowSidebar /> 
 
         <div className="flex-1 relative" ref={reactFlowWrapper}>
@@ -96,6 +96,7 @@ const FlowBuilder = () => {
             onDrop={onDrop}
             onDragOver={onDragOver}
             onNodeClick={(e, node) => setSelectedNode(node)}
+            onPaneClick={() => setSelectedNode(null)} // Click outside to close panel
             nodeTypes={nodeTypes}
             fitView
           >
@@ -104,13 +105,13 @@ const FlowBuilder = () => {
           </ReactFlow>
         </div>
 
-        {/* दाएँ तरफ वाला एडिट पैनल */}
         {selectedNode && (
           <PropertiesPanel 
             selectedNode={selectedNode}
             onUpdate={(id, newBlocks) => updateNodeData(id, newBlocks)}
             onDelete={(id) => {
               setNodes((nds) => nds.filter((n) => n.id !== id));
+              // Associated edges will automatically be cleaned up by React Flow
               setSelectedNode(null);
             }}
             onClose={() => setSelectedNode(null)}
@@ -122,3 +123,4 @@ const FlowBuilder = () => {
 };
 
 export default FlowBuilder;
+        
