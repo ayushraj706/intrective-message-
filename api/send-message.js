@@ -1,61 +1,50 @@
+import { db } from '../../firebase'; // अपने फायरबेस कॉन्फिग का सही पाथ दें
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import axios from 'axios';
-import { initializeApp, getApps, getApp, deleteApp } from "firebase/app";
-import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCCqWVSgULjZtgfOqVX3CBmOonxkr2UB7g",
-  authDomain: "whatsapp-950a8.firebaseapp.com",
-  projectId: "whatsapp-950a8", 
-  storageBucket: "whatsapp-950a8.firebasestorage.app",
-  messagingSenderId: "526342181957",
-  appId: "1:526342181957:web:0e71810f3ccbb297413f2c"
-};
-
-// --- मजबूत इनिशियलाइज़ेशन ---
-async function getFirebaseApp() {
-  const existingApps = getApps();
-  if (existingApps.length > 0) {
-    const app = existingApps[0];
-    // अगर पुराने ऐप में projectId नहीं है, तो उसे हटाओ
-    if (!app.options.projectId) {
-      await deleteApp(app);
-      return initializeApp(firebaseConfig);
-    }
-    return app;
-  }
-  return initializeApp(firebaseConfig);
-}
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
   const { userId, to, text } = req.body;
-  if (!userId || !to || !text) return res.status(400).json({ error: "Data missing" });
+
+  // ये वैल्यूज तुम्हें अपने Meta Developer Dashboard से मिलेंगी
+  const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN; 
+  const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 
   try {
-    const app = await getFirebaseApp();
-    const db = getFirestore(app);
+    // 1. व्हाट्सएप को असली मैसेज भेजना
+    const response = await axios.post(
+      `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to: to, // कस्टमर का नंबर
+        type: "text",
+        text: { body: text },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
-    const configSnap = await getDoc(doc(db, "configs", userId));
-    if (!configSnap.exists()) return res.status(404).json({ error: "Config missing" });
-    
-    const { accessToken, phoneId } = configSnap.data();
-
-    // Meta API Call
-    await axios.post(`https://graph.facebook.com/v18.0/${phoneId}/messages`, {
-      messaging_product: "whatsapp",
-      to: to.replace(/\D/g, ''), 
-      type: "text",
-      text: { body: text }
-    }, { headers: { Authorization: `Bearer ${accessToken}` } });
-
-    // History Save
+    // 2. फायरबेस में मैसेज सेव करना ताकि Inbox में तुरंत दिखे
     await addDoc(collection(db, "users", userId, "messages"), {
-      text: text, sender: 'admin', senderNumber: to, timestamp: serverTimestamp(),
+      sender: 'admin',
+      senderNumber: to,
+      text: text,
+      timestamp: serverTimestamp(),
+      messageId: response.data.messages[0].id // व्हाट्सएप का मैसेज ID
     });
 
-    return res.status(200).json({ success: true });
+    res.status(200).json({ success: true, messageId: response.data.messages[0].id });
+
   } catch (error) {
-    console.error("DEBUG ERROR:", error.message);
-    return res.status(500).json({ error: error.message });
+    console.error("WhatsApp API Error:", error.response?.data || error.message);
+    res.status(500).json({ 
+      error: "Message sending failed", 
+      details: error.response?.data || error.message 
+    });
   }
 }
