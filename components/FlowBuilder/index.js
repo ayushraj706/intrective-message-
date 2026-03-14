@@ -9,19 +9,31 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-// Firebase imports retained
+// Firebase imports (Safe)
 import { db, auth } from '../../firebase'; 
 import WhatsAppNode from './WhatsAppNode';
+import StartNode from './StartNode'; // Naya component
 import FlowSidebar from './Sidebar';
 import PropertiesPanel from './PropertiesPanel';
 
-const nodeTypes = { whatsappNode: WhatsAppNode };
+// Node Types Register
+const nodeTypes = { 
+  whatsappNode: WhatsAppNode,
+  startNode: StartNode 
+};
 
+// Initial State: Ek Start icon aur ek Welcome message pehle se rahega
 const initialNodes = [
+  { 
+    id: 'start_1', 
+    type: 'startNode', 
+    position: { x: 50, y: 200 }, 
+    data: {} 
+  },
   { 
     id: 'node_1', 
     type: 'whatsappNode', 
-    position: { x: 250, y: 100 }, 
+    position: { x: 200, y: 120 }, 
     data: { blocks: [{ id: 'blk_1', type: 'text', content: 'Welcome to BaseKey!' }] } 
   },
 ];
@@ -33,10 +45,10 @@ const FlowBuilder = () => {
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
 
-  // 1. Connection Logic (Connecting nodes & buttons)
+  // 1. Connection Logic: Ismein button handles automatically map honge
   const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
-  // 2. Drag & Drop Logic
+  // 2. Drag & Drop Logic: Screen coordinates ko flow coordinates mein convert karna
   const onDragOver = useCallback((event) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
@@ -57,7 +69,9 @@ const FlowBuilder = () => {
         id: `node_${Date.now()}`,
         type: 'whatsappNode',
         position,
-        data: { blocks: [{ id: `blk_${Date.now()}`, type: 'text', content: 'New Message' }] },
+        data: { 
+          blocks: [{ id: `blk_${Date.now()}`, type: 'text', content: 'New Message' }] 
+        },
       };
 
       setNodes((nds) => nds.concat(newNode));
@@ -65,13 +79,12 @@ const FlowBuilder = () => {
     [reactFlowInstance, setNodes]
   );
 
-  // 3. Update Node Data Logic (For Properties Panel)
+  // 3. Sync Logic: Jab properties panel mein update ho toh canvas par dikhe
   const updateNodeData = (nodeId, newBlocks) => {
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === nodeId) {
           const updatedNode = { ...node, data: { ...node.data, blocks: newBlocks } };
-          // Agar selected node update ho raha hai, toh panel ko bhi sync karein
           if (selectedNode?.id === nodeId) setSelectedNode(updatedNode);
           return updatedNode;
         }
@@ -81,7 +94,7 @@ const FlowBuilder = () => {
   };
 
   return (
-    <div className="flex h-screen bg-zinc-50 dark:bg-[#050505]">
+    <div className="flex h-screen bg-[#F8FAFC]"> {/* Professional Light Background */}
       <ReactFlowProvider>
         <FlowSidebar /> 
 
@@ -96,12 +109,16 @@ const FlowBuilder = () => {
             onDrop={onDrop}
             onDragOver={onDragOver}
             onNodeClick={(e, node) => setSelectedNode(node)}
-            onPaneClick={() => setSelectedNode(null)} // Click outside to close panel
+            onPaneClick={() => setSelectedNode(null)}
             nodeTypes={nodeTypes}
             fitView
+            // Professional Look Settings
+            snapToGrid={true}
+            snapGrid={[20, 20]}
           >
-            <Background variant="dots" gap={25} color="#333" />
-            <Controls className="bg-white dark:bg-zinc-900 border-none shadow-xl" />
+            {/* Background Style Updated */}
+            <Background variant="dots" gap={20} size={1} color="#E2E8F0" />
+            <Controls className="bg-white border-none shadow-md" />
           </ReactFlow>
         </div>
 
@@ -111,7 +128,6 @@ const FlowBuilder = () => {
             onUpdate={(id, newBlocks) => updateNodeData(id, newBlocks)}
             onDelete={(id) => {
               setNodes((nds) => nds.filter((n) => n.id !== id));
-              // Associated edges will automatically be cleaned up by React Flow
               setSelectedNode(null);
             }}
             onClose={() => setSelectedNode(null)}
@@ -123,4 +139,3 @@ const FlowBuilder = () => {
 };
 
 export default FlowBuilder;
-        
