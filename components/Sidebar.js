@@ -1,20 +1,29 @@
 import React from 'react';
-import { MessageSquare, Users, BarChart3, Globe, Settings, ChevronDown, Bot } from 'lucide-react';
+import { MessageSquare, Users, BarChart3, Globe, Settings, ChevronDown, Bot, Zap } from 'lucide-react';
 
 const Sidebar = ({ setActiveTab, activeTab }) => {
   return (
     <div className="w-64 h-screen bg-white dark:bg-[#1a1c1e] text-zinc-500 dark:text-gray-400 flex flex-col border-r border-zinc-200 dark:border-gray-800 shadow-xl transition-colors duration-300">
       <div className="p-5 flex items-center gap-3 text-zinc-900 dark:text-white border-b border-zinc-100 dark:border-gray-800/50">
         <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center font-bold text-lg shadow-lg shadow-blue-600/20 text-white">A</div>
-        <span className="font-bold tracking-tight text-lg">Ayus</span>
+        <span className="font-bold tracking-tight text-lg uppercase">BaseKey</span>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-4 space-y-1">
         <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-600 font-bold mb-3 block px-3">Main</label>
+        
         <NavItem icon={<MessageSquare size={19}/>} label="My Inbox" active={activeTab === 'inbox'} onClick={() => setActiveTab('inbox')} />
+        
         <NavItem icon={<Users size={19}/>} label="Contacts" active={activeTab === 'contacts'} onClick={() => setActiveTab('contacts')} />
         
-        {/* YE RAHA NAYA BUTTON */}
+        {/* NAYA FLOW BUILDER OPTION */}
+        <NavItem 
+          icon={<Zap size={19}/>} 
+          label="Interactive Flow" 
+          active={activeTab === 'flow'} 
+          onClick={() => setActiveTab('flow')} 
+        />
+        
         <NavItem icon={<Bot size={19}/>} label="AI Integration" active={activeTab === 'integration'} onClick={() => setActiveTab('integration')} />
         
         <NavItem icon={<BarChart3 size={19}/>} label="Reports" />
@@ -23,7 +32,9 @@ const Sidebar = ({ setActiveTab, activeTab }) => {
            <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-600 font-bold">Settings</label>
            <ChevronDown size={12} className="text-zinc-400 dark:text-zinc-600" />
         </div>
+        
         <NavItem icon={<Globe size={19}/>} label="Inboxes" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+        
         <NavItem icon={<Settings size={19}/>} label="Account Settings" />
       </nav>
 
