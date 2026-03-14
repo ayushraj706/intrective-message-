@@ -1,46 +1,125 @@
-import { auth } from '../firebase';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { LogIn } from 'lucide-react';
+import { Mail, ShieldCheck, Loader2 } from 'lucide-react';
 
 export default function Login() {
   const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [step, setStep] = useState('email'); // 'email' ya 'otp'
+  const [loading, setLoading] = useState(false);
 
-  const handleGoogleLogin = async () => {
-    const provider = new GoogleAuthProvider();
+  // 1. OTP Bhejne ka function
+  const handleSendOTP = async (e) => {
+    e.preventDefault();
+    setLoading(true);
     try {
-      // Firebase browser mein apne aap session save kar lega (Persistence)
-      await signInWithPopup(auth, provider);
-      router.push('/dashboard');
+      const res = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStep('otp'); // Email jane ke baad OTP step par jao
+      } else {
+        alert("Error: " + data.error);
+      }
     } catch (error) {
-      console.error("Login Error:", error.message);
-      alert("Login fail ho gaya: " + error.message);
+      alert("Fail ho gaya bhai!");
     }
+    setLoading(false);
+  };
+
+  // 2. OTP Verify karne ka function
+  const handleVerifyOTP = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch('/api/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Verification success!
+        router.push('/dashboard'); 
+      } else {
+        alert("Galat OTP: " + data.error);
+      }
+    } catch (error) {
+      alert("Verification fail ho gaya!");
+    }
+    setLoading(false);
   };
 
   return (
     <div className="min-h-screen bg-[#050505] flex items-center justify-center p-6 text-white font-sans">
-      <div className="w-full max-w-md bg-[#121212] border border-gray-800 rounded-3xl p-10 text-center shadow-2xl">
+      <div className="w-full max-w-md bg-[#121212] border border-gray-800 rounded-3xl p-10 text-center shadow-2xl transition-all">
+        
         <div className="mb-8 inline-flex p-4 bg-blue-500/10 rounded-full border border-blue-500/20">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <ShieldCheck size={40} className="text-blue-500" />
         </div>
         
-        <h1 className="text-4xl font-extrabold mb-2 tracking-tighter">Base<span className="text-blue-500">Key</span> AI</h1>
-        <p className="text-gray-500 mb-10 text-sm">Sirf Authorized Admin hi entry kar sakte hain.</p>
+        <h1 className="text-4xl font-extrabold mb-2 tracking-tighter italic">Base<span className="text-blue-500">Key</span> Studio</h1>
+        <p className="text-gray-500 mb-10 text-sm">
+          {step === 'email' ? 'Apna Authorized Email dalein' : 'Email par bheja gaya OTP dalein'}
+        </p>
 
-        <button 
-          onClick={handleGoogleLogin}
-          className="w-full bg-white text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-gray-200 transition-all shadow-lg"
-        >
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" alt="G" />
-          Sign in with Google
-        </button>
+        {step === 'email' ? (
+          <form onSubmit={handleSendOTP} className="space-y-4 text-left">
+            <div className="relative">
+              <Mail className="absolute left-4 top-4 text-gray-500" size={20} />
+              <input 
+                type="email" 
+                required
+                placeholder="admin@ayus.fun"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-black border border-gray-800 rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-blue-500 transition-all text-sm"
+              />
+            </div>
+            <button 
+              type="submit"
+              disabled={loading}
+              className="w-full bg-white text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-gray-200 transition-all shadow-lg disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="animate-spin" /> : 'Get Login OTP'}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleVerifyOTP} className="space-y-4 text-left">
+            <input 
+              type="text" 
+              required
+              placeholder="6-Digit OTP"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
+              className="w-full bg-black border border-gray-800 rounded-2xl py-4 px-4 outline-none focus:border-blue-500 transition-all text-center text-2xl font-bold tracking-[0.5em]"
+            />
+            <button 
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-blue-700 transition-all shadow-lg disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="animate-spin" /> : 'Verify & Enter Dashboard'}
+            </button>
+            <button 
+              type="button" 
+              onClick={() => setStep('email')} 
+              className="w-full text-xs text-gray-500 uppercase font-bold tracking-widest mt-2 hover:text-white"
+            >
+              Email Badlein
+            </button>
+          </form>
+        )}
 
-        <p className="mt-8 text-[10px] text-gray-600 uppercase tracking-widest">Secure Admin Access Only</p>
+        <p className="mt-8 text-[10px] text-gray-700 uppercase tracking-[0.3em] font-black">
+          Powered by Resend & Firebase
+        </p>
       </div>
     </div>
   );
 }
-
