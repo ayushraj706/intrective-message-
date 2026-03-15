@@ -28,14 +28,22 @@ const AccountSettings = () => {
     loadUser();
   }, []);
 
+  // --- UPDATED THEME LOGIC ---
   const handleThemeChange = (newTheme) => {
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
     const html = document.documentElement;
-    if (newTheme === 'dark' || (newTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    
+    if (newTheme === 'dark') {
       html.classList.add('dark');
-    } else {
+    } else if (newTheme === 'light') {
       html.classList.remove('dark');
+    } else if (newTheme === 'system') {
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        html.classList.add('dark');
+      } else {
+        html.classList.remove('dark');
+      }
     }
   };
 
@@ -50,7 +58,6 @@ const AccountSettings = () => {
     }
 
     try {
-      // Use setDoc with merge: true for crash-proofing
       await setDoc(doc(db, "users", email), {
         name,
         isPrivate,
@@ -66,7 +73,7 @@ const AccountSettings = () => {
     <div className="p-8 md:p-12 h-screen overflow-y-auto bg-zinc-50 dark:bg-[#080808] transition-colors duration-500">
       <div className="max-w-4xl mx-auto space-y-10">
         <header>
-          <h1 className="text-4xl font-black tracking-tighter dark:text-white italic uppercase italic">Account <span className="text-blue-500">Settings</span></h1>
+          <h1 className="text-4xl font-black tracking-tighter dark:text-white italic uppercase">Account <span className="text-blue-500">Settings</span></h1>
           <p className="text-zinc-500 text-sm mt-2">Personalize your admin identity and dashboard behavior.</p>
         </header>
 
@@ -77,7 +84,7 @@ const AccountSettings = () => {
             </div>
             <div>
               <h3 className="text-xl font-bold dark:text-white">Profile Identity</h3>
-              <p className="text-zinc-500 text-xs">Public name and admin avatar identification.</p>
+              <p className="text-zinc-500 text-xs font-medium">Public name and admin avatar identification.</p>
             </div>
           </div>
           <div className="space-y-4 text-left">
@@ -111,4 +118,5 @@ const ThemeCard = ({ active, onClick, icon, label }) => (
 );
 
 export default AccountSettings;
+  
   
