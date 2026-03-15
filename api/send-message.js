@@ -3,12 +3,14 @@ import { initializeApp, getApps, getApp, deleteApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCCqWVSgULjZtgfOqVX3CBmOonxkr2UB7g",
-  authDomain: "whatsapp-950a8.firebaseapp.com",
-  projectId: "whatsapp-950a8", 
-  storageBucket: "whatsapp-950a8.firebasestorage.app",
-  messagingSenderId: "526342181957",
-  appId: "1:526342181957:web:0e71810f3ccbb297413f2c"
+  apiKey: "AIzaSyCDmDsi_JMQgx_QO4p8bnvfh-vKdN4Bmk8",
+  authDomain: "success-points.firebaseapp.com",
+  databaseURL: "https://success-points-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "success-points",
+  storageBucket: "success-points.firebasestorage.app",
+  messagingSenderId: "51177935348",
+  appId: "1:51177935348:web:33fc4a6810790a3cbd29a1",
+  measurementId: "G-64DR1TSTKY"
 };
 
 // --- à¤®à¤œà¤¬à¥‚à¤¤ à¤‡à¤¨à¤¿à¤¶à¤¿à¤¯à¤²à¤¾à¤‡à¥›à¥‡à¤¶à¤¨ ---
