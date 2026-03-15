@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   const { email, otp } = req.body;
 
   try {
-    // 1. Firebase se OTP nikalo
+    // 1. Firebase se OTP wala document nikalo
     const doc = await db.collection('otps').doc(email).get();
     
     if (!doc.exists) {
@@ -22,20 +22,31 @@ export default async function handler(req, res) {
     }
 
     const data = doc.data();
+
+    // 2. Expiry Check (Check karo ki 5 min se zyada toh nahi ho gaye)
+    const currentTime = Date.now();
+    if (data.expiresAt && currentTime > data.expiresAt) {
+      return res.status(400).json({ success: false, error: 'OTP expire ho gaya hai, naya mangwayein!' });
+    }
     
-    // 2. OTP Match karo
+    // 3. OTP Match karo
     if (data.otp === otp) {
-      // SUCCESS! Ab is email ko "users" wali list mein permanent save kar lo
+      // SUCCESS! User ko update karo
       await db.collection('users').doc(email).set({
         email: email,
         lastLogin: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
 
+      // OTP use ho gaya, toh ise delete kar dena security ke liye achha hai
+      await db.collection('otps').doc(email).delete();
+
+      // Frontend ko signal bhejo
       res.status(200).json({ success: true, message: 'Login Mast Hua!' });
     } else {
       res.status(400).json({ success: false, error: 'Galat OTP bhai!' });
     }
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Verify Error:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 }
