@@ -3,7 +3,21 @@ import { useEffect } from 'react';
 
 function MyApp({ Component, pageProps }) {
   useEffect(() => {
-    // Check karein ki browser Service Worker support karta hai ya nahi
+    // 1. Theme Engine: LocalStorage se theme uthao
+    const savedTheme = localStorage.getItem('theme') || 'system';
+    const html = document.documentElement;
+
+    const applyTheme = (themeName) => {
+      if (themeName === 'dark' || (themeName === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        html.classList.add('dark');
+      } else {
+        html.classList.remove('dark');
+      }
+    };
+
+    applyTheme(savedTheme);
+
+    // 2. Service Worker Registration
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker
@@ -18,4 +32,3 @@ function MyApp({ Component, pageProps }) {
 }
 
 export default MyApp;
-
