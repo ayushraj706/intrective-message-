@@ -4,7 +4,8 @@ export default {
     "./pages/**/*.{js,ts,jsx,tsx}",
     "./components/**/*.{js,ts,jsx,tsx}",
   ],
-  darkMode: 'media', // <-- 'class' की जगह 'media' कर दो
+  // CRITICAL: Manual toggle ke liye 'class' hona zaroori hai
+  darkMode: 'class', 
   theme: {
     extend: {},
   },
