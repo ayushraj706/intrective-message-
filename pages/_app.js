@@ -8,7 +8,10 @@ function MyApp({ Component, pageProps }) {
     const html = document.documentElement;
 
     const applyTheme = (themeName) => {
-      if (themeName === 'dark' || (themeName === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      if (
+        themeName === 'dark' || 
+        (themeName === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+      ) {
         html.classList.add('dark');
       } else {
         html.classList.remove('dark');
