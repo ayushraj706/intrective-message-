@@ -13,7 +13,7 @@ const firebaseConfig = {
   measurementId: "G-64DR1TSTKY"
 };
 
-// Initialize Firebase (SSR Safe)
+// Initialize Firebase (SSR Safe logic)
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
