@@ -3,7 +3,7 @@ import {
   MessageSquare, Users, BarChart3, LayoutDashboard, 
   Settings, ChevronDown, Bot, Zap 
 } from 'lucide-react';
-import UserProfile from './UserProfile'; // Naya component import kiya
+import UserProfile from './UserProfile';
 
 const Sidebar = ({ setActiveTab, activeTab }) => {
   return (
@@ -30,7 +30,14 @@ const Sidebar = ({ setActiveTab, activeTab }) => {
         </div>
         
         <NavItem icon={<LayoutDashboard size={19}/>} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-        <NavItem icon={<Settings size={19}/>} label="Account Settings" />
+        
+        {/* FIX: Yahan active aur onClick add kiya gaya hai */}
+        <NavItem 
+          icon={<Settings size={19}/>} 
+          label="Account Settings" 
+          active={activeTab === 'settings'} 
+          onClick={() => setActiveTab('settings')} 
+        />
       </nav>
 
       {/* --- USER PROFILE SECTION --- */}
