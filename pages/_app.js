@@ -1,9 +1,9 @@
 import '../styles/globals.css';
 import { useEffect } from 'react';
+import { Toaster } from 'sonner';
 
 function MyApp({ Component, pageProps }) {
   useEffect(() => {
-    // 1. Theme Engine: LocalStorage se theme uthao
     const savedTheme = localStorage.getItem('theme') || 'system';
     const html = document.documentElement;
 
@@ -20,7 +20,6 @@ function MyApp({ Component, pageProps }) {
 
     applyTheme(savedTheme);
 
-    // 2. Service Worker Registration
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker
@@ -31,7 +30,13 @@ function MyApp({ Component, pageProps }) {
     }
   }, []);
 
-  return <Component {...pageProps} />;
+  return (
+    <>
+      {/* Global Toaster: Ye notifications ko handle karega */}
+      <Toaster position="bottom-right" richColors theme="dark" expand={true} />
+      <Component {...pageProps} />
+    </>
+  );
 }
 
 export default MyApp;
