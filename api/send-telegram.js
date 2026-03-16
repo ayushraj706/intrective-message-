@@ -14,33 +14,56 @@ const db = getFirestore(app);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  const { userId, to, text } = req.body;
+  
+  // Yahan mediaUrl aur mediaType bhi aayega
+  const { userId, to, text, mediaUrl, mediaType } = req.body;
 
-  if (!userId || !to || !text) return res.status(400).json({ error: "Data missing" });
+  if (!userId || !to) return res.status(400).json({ error: "Data missing" });
 
   try {
-    // 1. Fetch Token from Config
     const configSnap = await getDoc(doc(db, "configs", userId));
     const { telegramBotToken } = configSnap.data();
 
     if (!telegramBotToken) return res.status(400).json({ error: "Telegram Bot Token not configured." });
 
-    // 2. Send via Telegram API
-    const tgRes = await axios.post(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
-      chat_id: to,
-      text: text
-    });
+    let tgRes;
+    
+    // --- MEDIA BHEJNE KA LOGIC ---
+    if (mediaUrl) {
+      if (mediaType === 'image') {
+        tgRes = await axios.post(`https://api.telegram.org/bot${telegramBotToken}/sendPhoto`, {
+          chat_id: to,
+          photo: mediaUrl,
+          caption: text || "" // Agar photo ke sath text hai
+        });
+      } else {
+        tgRes = await axios.post(`https://api.telegram.org/bot${telegramBotToken}/sendDocument`, {
+          chat_id: to,
+          document: mediaUrl,
+          caption: text || ""
+        });
+      }
+    } 
+    // --- SIRF TEXT BHEJNE KA LOGIC ---
+    else {
+      tgRes = await axios.post(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+        chat_id: to,
+        text: text
+      });
+    }
 
     const wamid = tgRes.data.result.message_id.toString();
 
-    // 3. Save to Firebase (Platform tag zaroori hai)
+    // Firebase mein save karna
     await addDoc(collection(db, "users", userId, "messages"), {
-      text: text, 
+      text: text || (mediaType === 'image' ? "📷 Photo" : "📄 File"), 
+      mediaUrl: mediaUrl || null,
+      mediaType: mediaType || null,
       sender: 'admin', 
       senderNumber: to, 
       wamid: wamid,
-      status: 'sent',
-      platform: 'telegram', // Naye messages telegram tagged rahenge
+      status: 'sent', // Telegram mein hamesha 'sent' rahega
+      platform: 'telegram', 
       timestamp: serverTimestamp(),
     });
 
