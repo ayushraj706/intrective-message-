@@ -13,7 +13,6 @@ const firebaseConfig = {
   measurementId: "G-64DR1TSTKY"
 };
 
-// --- मजबूत इनिशियलाइज़ेशन ---
 async function getFirebaseApp() {
   const existingApps = getApps();
   if (existingApps.length > 0) {
@@ -29,32 +28,31 @@ async function getFirebaseApp() {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  const { userId, to, text } = req.body;
-  if (!userId || !to || !text) return res.status(400).json({ error: "Data missing" });
+  const { userId, to, mediaUrl, mediaType } = req.body;
 
   try {
     const app = await getFirebaseApp();
     const db = getFirestore(app);
-
-    const configSnap = await getDoc(doc(db, "configs", userId));
-    if (!configSnap.exists()) return res.status(404).json({ error: "Config missing" });
     
+    const configSnap = await getDoc(doc(db, "configs", userId));
     const { accessToken, phoneId } = configSnap.data();
 
-    // 1. Meta API Call (Purana Logic Safe Hai)
+    // 1. Meta ko media link dena
     const metaResponse = await axios.post(`https://graph.facebook.com/v18.0/${phoneId}/messages`, {
       messaging_product: "whatsapp",
-      to: to.replace(/\D/g, ''), 
-      type: "text",
-      text: { body: text }
+      to: to.replace(/\D/g, ''),
+      type: mediaType,
+      [mediaType]: { link: mediaUrl }
     }, { headers: { Authorization: `Bearer ${accessToken}` } });
 
-    // 2. Meta se WAMID nikalna (For Ticks)
+    // 2. WAMID nikalna
     const wamid = metaResponse.data.messages[0].id;
 
-    // 3. History Save (With WAMID & Status)
+    // 3. History save karna
     await addDoc(collection(db, "users", userId, "messages"), {
-      text: text, 
+      text: mediaType === 'image' ? "📷 Photo" : "📄 File",
+      mediaUrl, 
+      mediaType, 
       sender: 'admin', 
       senderNumber: to, 
       wamid: wamid,       // Webhook isko dhoondhega
@@ -64,7 +62,6 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ success: true, wamid });
   } catch (error) {
-    console.error("DEBUG ERROR:", error.message);
     return res.status(500).json({ error: error.message });
   }
 }
