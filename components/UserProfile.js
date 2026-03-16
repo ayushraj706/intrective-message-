@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import { auth, db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
-const UserProfile = ({ isCollapsed }) => { // isCollapsed prop yahan receive ho raha hai
+const UserProfile = ({ isCollapsed }) => {
   const router = useRouter();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [userData, setUserData] = useState({ name: 'Admin', email: '' });
@@ -39,9 +39,15 @@ const UserProfile = ({ isCollapsed }) => { // isCollapsed prop yahan receive ho 
 
   return (
     <div className="mt-auto relative">
-      {/* --- Profile Menu Popup --- */}
+      {/* --- Smart Profile Menu --- */}
       {showProfileMenu && (
-        <div className={`absolute bottom-[110%] left-0 ${isCollapsed ? 'w-48' : 'right-0'} mb-2 bg-white dark:bg-[#1a1c1e] border border-zinc-200 dark:border-white/10 rounded-2xl shadow-2xl p-2 animate-in fade-in slide-in-from-bottom-2 z-[100] backdrop-blur-xl`}>
+        <div 
+          className={`absolute bg-white dark:bg-[#1a1c1e] border border-zinc-200 dark:border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] p-2 animate-in fade-in slide-in-from-bottom-2 z-[999] backdrop-blur-2xl
+            ${isCollapsed 
+              ? 'left-[110%] bottom-0 w-56' // Chhotte sidebar mein side mein khulega
+              : 'bottom-[115%] left-0 right-0' // Badde sidebar mein upar khulega
+            }`}
+        >
           <div className="p-3 border-b border-zinc-100 dark:border-white/5 mb-1 text-left">
             <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Signed in as</p>
             <p className="text-xs font-bold text-zinc-900 dark:text-white truncate">{userData.email || "Identifying..."}</p>
@@ -59,17 +65,15 @@ const UserProfile = ({ isCollapsed }) => { // isCollapsed prop yahan receive ho 
           ${isCollapsed ? 'justify-center p-2' : 'p-3 gap-3'} 
           ${showProfileMenu ? 'bg-zinc-100 dark:bg-[#27292d] border-zinc-200 dark:border-white/5' : 'border-transparent hover:bg-zinc-50 dark:hover:bg-[#1d1f23]'}`}
       >
-        {/* Avatar */}
         <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shrink-0 shadow-md">
           {userData.name.charAt(0).toUpperCase()}
         </div>
 
-        {/* Text Info - Yeh sirf tab dikhega jab sidebar bada ho */}
         {!isCollapsed && (
           <>
             <div className="flex flex-col text-left overflow-hidden">
                 <span className="text-xs font-bold text-zinc-900 dark:text-white truncate">{userData.name}</span>
-                <span className="text-[10px] text-zinc-500 font-medium">BaseKey Admin</span>
+                <span className="text-[10px] text-zinc-500 font-medium whitespace-nowrap">BaseKey Admin</span>
             </div>
             <ChevronUp size={14} className={`ml-auto text-zinc-400 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
           </>
