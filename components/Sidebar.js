@@ -4,15 +4,30 @@ import {
   Settings, ChevronDown, Bot, Zap, ChevronLeft, ChevronRight 
 } from 'lucide-react';
 import UserProfile from './UserProfile';
+// --- NAYA IMPORT: Path sahi rakha hai ---
+import NotificationCenter from './layout/NotificationCenter'; 
 
 const Sidebar = ({ setActiveTab, activeTab, isCollapsed, setIsCollapsed }) => {
   return (
     <div className={`w-full h-full bg-white dark:bg-[#1a1c1e] text-zinc-500 dark:text-gray-400 flex flex-col border-r border-zinc-200 dark:border-gray-800 shadow-xl transition-all duration-300`}>
       
-      {/* Brand Logo */}
-      <div className={`h-20 p-5 flex items-center gap-3 text-zinc-900 dark:text-white border-b border-zinc-100 dark:border-gray-800/50 transition-all ${isCollapsed ? 'justify-center px-0' : ''}`}>
-        <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center font-bold text-lg shadow-lg shadow-blue-600/20 text-white shrink-0">B</div>
-        {!isCollapsed && <span className="font-bold tracking-tight text-lg uppercase italic whitespace-nowrap">Base<span className="text-blue-600">Key</span></span>}
+      {/* Brand Logo & Notification Center */}
+      <div className={`h-20 p-5 flex items-center text-zinc-900 dark:text-white border-b border-zinc-100 dark:border-gray-800/50 transition-all ${isCollapsed ? 'justify-center px-0' : 'justify-between'}`}>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center font-bold text-lg shadow-lg shadow-blue-600/20 text-white shrink-0">B</div>
+          {!isCollapsed && (
+            <span className="font-bold tracking-tight text-lg uppercase italic whitespace-nowrap animate-in fade-in slide-in-from-left-4">
+              Base<span className="text-blue-600">Key</span>
+            </span>
+          )}
+        </div>
+
+        {/* --- BELL ICON: Sirf tab dikhega jab sidebar khula ho --- */}
+        {!isCollapsed && (
+          <div className="animate-in fade-in zoom-in duration-500">
+            <NotificationCenter />
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
@@ -40,7 +55,7 @@ const Sidebar = ({ setActiveTab, activeTab, isCollapsed, setIsCollapsed }) => {
         <NavItem icon={<Settings size={20}/>} label="Account Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} isCollapsed={isCollapsed} />
       </nav>
 
-      {/* --- META STYLE COLLAPSE BUTTON --- */}
+      {/* --- COLLAPSE BUTTON --- */}
       <div className="px-4 py-2 border-t border-zinc-100 dark:border-gray-800">
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
@@ -52,9 +67,8 @@ const Sidebar = ({ setActiveTab, activeTab, isCollapsed, setIsCollapsed }) => {
         </button>
       </div>
 
-      {/* --- USER PROFILE SECTION (FIXED) --- */}
+      {/* --- USER PROFILE SECTION --- */}
       <div className={`p-4 border-t border-zinc-100 dark:border-gray-800 flex relative z-[100] ${isCollapsed ? 'justify-center' : ''}`}>
-        {/* 'overflow-hidden' hata diya taaki popup bahar nikal sake */}
         <div className={isCollapsed ? 'w-10' : 'w-full'}>
             <UserProfile isCollapsed={isCollapsed} />
         </div>
@@ -63,7 +77,7 @@ const Sidebar = ({ setActiveTab, activeTab, isCollapsed, setIsCollapsed }) => {
   );
 };
 
-// NavItem Code
+// NavItem Code (Same as before)
 const NavItem = ({ icon, label, active, onClick, isCollapsed }) => (
   <button 
     onClick={onClick}
