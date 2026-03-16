@@ -13,12 +13,11 @@ const firebaseConfig = {
   measurementId: "G-64DR1TSTKY"
 };
 
-// --- à¤®à¤œà¤¬à¥‚à¤¤ à¤‡à¤¨à¤¿à¤¶à¤¿à¤¯à¤²à¤¾à¤‡à¥›à¥‡à¤¶à¤¨ ---
+// --- मजबूत इनिशियलाइज़ेशन ---
 async function getFirebaseApp() {
   const existingApps = getApps();
   if (existingApps.length > 0) {
     const app = existingApps[0];
-    // à¤…à¤—à¤° à¤ªà¥à¤°à¤¾à¤¨à¥‡ à¤à¤ª à¤®à¥‡à¤‚ projectId à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ, à¤¤à¥‹ à¤‰à¤¸à¥‡ à¤¹à¤Ÿà¤¾à¤“
     if (!app.options.projectId) {
       await deleteApp(app);
       return initializeApp(firebaseConfig);
@@ -42,20 +41,28 @@ export default async function handler(req, res) {
     
     const { accessToken, phoneId } = configSnap.data();
 
-    // Meta API Call
-    await axios.post(`https://graph.facebook.com/v18.0/${phoneId}/messages`, {
+    // 1. Meta API Call (Purana Logic Safe Hai)
+    const metaResponse = await axios.post(`https://graph.facebook.com/v18.0/${phoneId}/messages`, {
       messaging_product: "whatsapp",
       to: to.replace(/\D/g, ''), 
       type: "text",
       text: { body: text }
     }, { headers: { Authorization: `Bearer ${accessToken}` } });
 
-    // History Save
+    // 2. Meta se WAMID nikalna (For Ticks)
+    const wamid = metaResponse.data.messages[0].id;
+
+    // 3. History Save (With WAMID & Status)
     await addDoc(collection(db, "users", userId, "messages"), {
-      text: text, sender: 'admin', senderNumber: to, timestamp: serverTimestamp(),
+      text: text, 
+      sender: 'admin', 
+      senderNumber: to, 
+      wamid: wamid,       // Webhook isko dhoondhega
+      status: 'sent',     // Single tick yahan se aayega
+      timestamp: serverTimestamp(),
     });
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, wamid });
   } catch (error) {
     console.error("DEBUG ERROR:", error.message);
     return res.status(500).json({ error: error.message });
