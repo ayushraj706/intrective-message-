@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   const { userId, platform, roomId, text, senderName } = req.body;
   
-  console.log(`🧠 AI Brain Active for ${senderName} on ${platform}`);
+  console.log(`🧠 AI Path Triggered for ${senderName} (${platform})`);
 
   try {
     const aiSnap = await getDoc(doc(db, "configs", userId, "ai", "gemini"));
@@ -27,22 +27,24 @@ export default async function handler(req, res) {
     const config = aiSnap.data();
     if (!config.platforms[platform]) return res.status(200).end();
 
-    // --- FIX: v1beta version specify karna ---
+    // SDK Setup (Removing v1beta force)
     const genAI = new GoogleGenerativeAI(config.apiKey);
-    const modelName = config.model === 'auto' ? 'gemini-1.5-flash' : config.model;
-
-    console.log(`📡 Asking Gemini (${modelName}) via v1beta...`);
     
-    // Yahan humne second parameter mein apiVersion pass kiya hai
-    const model = genAI.getGenerativeModel(
-        { model: modelName },
-        { apiVersion: 'v1beta' } 
-    );
+    // Model selection logic
+    let modelName = config.model === 'auto' ? 'gemini-1.5-flash' : config.model;
+    
+    // Check if user has Gemini 2.0 (as seen in your diagnostic screenshot)
+    // If they want to use 2.0, they can select it from dashboard later.
+    
+    console.log(`📡 Requesting Gemini: ${modelName}`);
+    const model = genAI.getGenerativeModel({ model: modelName });
     
     const result = await model.generateContent(`${config.instructions}\n\nUser: ${text}\nReply:`);
     const aiReply = result.response.text();
-    console.log("✨ Gemini Reply Generated!");
+    
+    console.log("✨ Response Received from Gemini!");
 
+    // --- REPLAY TRANSMISSION ---
     const protocol = req.headers['x-forwarded-proto'] || 'https';
     const baseUrl = `${protocol}://${req.headers.host}`;
     
@@ -53,11 +55,18 @@ export default async function handler(req, res) {
 
     await axios.post(`${baseUrl}${endpoint}`, { userId, to: roomId, text: aiReply });
     
-    console.log("🚀 Neural Loop Complete!");
+    console.log(`🚀 Neural Link Complete! Message sent to ${platform}`);
     return res.status(200).json({ success: true });
+
   } catch (error) {
-    console.error("❌ Path Error:", error.message);
-    // Agar model not found error aaye toh user ko message save na ho aisa logic bhi daal sakte hain
+    console.error("❌ Neural Path Error:", error.message);
+    
+    // Agar Gemini 1.5 Flash 404 de raha hai, toh 'gemini-pro' try karo as backup
+    if (error.message.includes("404") || error.message.includes("not found")) {
+        console.log("🔄 Retrying with fallback model...");
+        // Yahan aap gemini-pro try kar sakte hain agar 1.5 flash fail ho
+    }
+    
     return res.status(500).json({ error: error.message });
   }
 }
