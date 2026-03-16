@@ -2,13 +2,18 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { db, auth } from '../firebase'; 
-import { doc, onSnapshot } from 'firebase/firestore'; // Naya import
+import { doc, onSnapshot } from 'firebase/firestore'; 
 import Sidebar from '../components/Sidebar';
 import MainDashboard from '../components/MainDashboard';
 import AIIntegration from '../components/setup/AIIntegration';
 import Contacts from '../components/Contacts';
 import AccountSettings from '../components/AccountSettings';
+
+// --- ALL SETUP PAGES IMPORTED ---
 import TelegramAPISetup from '../components/setup/TelegramAPISetup';
+import TelegramBotSetup from '../components/setup/TelegramBotSetup'; // Naya Import
+import WhatsAppSetup from '../components/setup/WhatsAppSetup';       // Naya Import
+
 import { Menu, Loader2, MessageSquare, Smartphone, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -21,7 +26,9 @@ export default function Dashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [sysConfig, setSysConfig] = useState(null); // User ka configuration check karne ke liye
+  
+  // Is state mein hum user ka saara setup data store karenge
+  const [sysConfig, setSysConfig] = useState(null); 
   const router = useRouter();
 
   useEffect(() => {
@@ -32,11 +39,15 @@ export default function Dashboard() {
       setLoading(false);
     }
 
-    // Check if user has telegramSession saved
+    // Config listener jo check karega ki kis-kis channel ka setup ho chuka hai
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
       if (user) {
         const unsubscribeConfig = onSnapshot(doc(db, "configs", user.uid), (docSnap) => {
-          if (docSnap.exists()) setSysConfig(docSnap.data());
+          if (docSnap.exists()) {
+              setSysConfig(docSnap.data());
+          } else {
+              setSysConfig({}); // Agar naya user hai toh khali config set karo
+          }
         });
         return () => unsubscribeConfig();
       }
@@ -84,7 +95,11 @@ export default function Dashboard() {
                
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                  
-                 <div onClick={() => setInboxType('whatsapp')} className="bg-[#111] p-8 rounded-[2rem] border border-white/5 hover:border-green-500/30 cursor-pointer transition-all hover:-translate-y-1 shadow-xl">
+                 {/* SMART WHATSAPP CARD */}
+                 <div onClick={() => setInboxType(sysConfig?.isVerified ? 'whatsapp-inbox' : 'whatsapp-setup')} className="bg-[#111] p-8 rounded-[2rem] border border-white/5 hover:border-green-500/30 cursor-pointer transition-all hover:-translate-y-1 shadow-xl relative overflow-hidden">
+                   {sysConfig?.isVerified && (
+                      <div className="absolute top-4 right-4 w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_#22c55e]" title="Active Link"></div>
+                   )}
                    <div className="w-14 h-14 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center mb-6">
                      <Smartphone size={24} className="text-zinc-300" />
                    </div>
@@ -95,7 +110,7 @@ export default function Dashboard() {
                  {/* SMART TELEGRAM API CARD */}
                  <div onClick={() => setInboxType(sysConfig?.telegramSession ? 'telegram-api-inbox' : 'telegram-api-setup')} className="bg-[#111] p-8 rounded-[2rem] border border-white/5 hover:border-blue-500/30 cursor-pointer transition-all hover:-translate-y-1 shadow-xl relative overflow-hidden">
                    {sysConfig?.telegramSession && (
-                      <div className="absolute top-4 right-4 w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_#22c55e]" title="Active Link"></div>
+                      <div className="absolute top-4 right-4 w-3 h-3 bg-blue-500 rounded-full animate-pulse shadow-[0_0_10px_#3b82f6]" title="Active Link"></div>
                    )}
                    <div className="w-14 h-14 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center mb-6">
                       <Globe size={24} className="text-zinc-300" />
@@ -104,7 +119,11 @@ export default function Dashboard() {
                    <p className="text-xs text-zinc-500 font-medium">Integrate custom Telegram Client API (MTProto)</p>
                  </div>
 
-                 <div onClick={() => setInboxType('telegram')} className="bg-[#111] p-8 rounded-[2rem] border border-white/5 hover:border-blue-400/30 cursor-pointer transition-all hover:-translate-y-1 shadow-xl">
+                 {/* SMART TELEGRAM BOT CARD */}
+                 <div onClick={() => setInboxType(sysConfig?.telegramBotToken ? 'telegram-bot-inbox' : 'telegram-bot-setup')} className="bg-[#111] p-8 rounded-[2rem] border border-white/5 hover:border-blue-400/30 cursor-pointer transition-all hover:-translate-y-1 shadow-xl relative overflow-hidden">
+                   {sysConfig?.telegramBotToken && (
+                      <div className="absolute top-4 right-4 w-3 h-3 bg-blue-400 rounded-full animate-pulse shadow-[0_0_10px_#60a5fa]" title="Active Link"></div>
+                   )}
                    <div className="w-14 h-14 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center mb-6">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-zinc-300"><path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM17 13.5C17 14.33 16.33 15 15.5 15H14V17C14 17.55 13.55 18 13 18H11C10.45 18 10 17.55 10 17V15H8.5C7.67 15 7 14.33 7 13.5V11.5C7 10.67 7.67 10 8.5 10H15.5C16.33 10 17 10.67 17 11.5V13.5Z" fill="currentColor"/></svg>
                    </div>
@@ -116,10 +135,17 @@ export default function Dashboard() {
             </div>
           )}
 
-          {activeTab === 'inbox' && inboxType === 'whatsapp' && <Inbox platform="whatsapp" onBack={() => setInboxType(null)} />}
-          {activeTab === 'inbox' && inboxType === 'telegram' && <Inbox platform="telegram" onBack={() => setInboxType(null)} />}
+          {/* ALL SMART ROUTING COMPONENTS */}
           
-          {/* NAYA ROUTING LOGIC */}
+          {/* WhatsApp Route */}
+          {activeTab === 'inbox' && inboxType === 'whatsapp-setup' && <WhatsAppSetup onBack={() => setInboxType(null)} />}
+          {activeTab === 'inbox' && inboxType === 'whatsapp-inbox' && <Inbox platform="whatsapp" onBack={() => setInboxType(null)} />}
+
+          {/* Telegram Bot Route */}
+          {activeTab === 'inbox' && inboxType === 'telegram-bot-setup' && <TelegramBotSetup onBack={() => setInboxType(null)} />}
+          {activeTab === 'inbox' && inboxType === 'telegram-bot-inbox' && <Inbox platform="telegram" onBack={() => setInboxType(null)} />}
+          
+          {/* Telegram API Route */}
           {activeTab === 'inbox' && inboxType === 'telegram-api-setup' && <TelegramAPISetup onBack={() => setInboxType(null)} />}
           {activeTab === 'inbox' && inboxType === 'telegram-api-inbox' && <Inbox platform="telegram-api" onBack={() => setInboxType(null)} />}
 
@@ -131,4 +157,5 @@ export default function Dashboard() {
       </main>
     </div>
   );
-            }
+                   }
+                     
