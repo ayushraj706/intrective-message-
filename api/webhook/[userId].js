@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, addDoc, updateDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import axios from "axios"; // Naya Import
 
 // --- 1. FIREBASE CONFIGURATION ---
 const firebaseConfig = {
@@ -73,36 +74,49 @@ export default async function handler(req, res) {
 
           console.log(`📩 New message from ${senderNumber}: ${messageText}`);
 
+          // --- AAPKA MEHNAT WALA SAVE LOGIC ---
           await addDoc(collection(db, "users", userId, "messages"), {
             text: messageText,
             sender: 'customer',
             senderNumber: senderNumber,
             senderName: senderName,
-            wamid: wamid, // Is ID ko save karna zaroori hai
+            wamid: wamid, 
             timestamp: serverTimestamp(),
             roomId: senderNumber,
-            status: 'received'
+            status: 'received',
+            platform: 'whatsapp' // Room identification ke liye zaroori
           });
+
+          // --- NAYA AI TRIGGER (Vercel Brain Link) ---
+          const protocol = req.headers['x-forwarded-proto'] || 'https';
+          const baseUrl = `${protocol}://${req.headers.host}`;
+          
+          // Bina wait kiye AI handler ko call bhej rahe hain
+          axios.post(`${baseUrl}/api/ai-handler`, {
+            userId: userId,
+            platform: 'whatsapp',
+            roomId: senderNumber,
+            text: messageText,
+            senderName: senderName
+          }).catch(err => console.log("🤖 WhatsApp AI Trigger Failed:", err.message));
 
           return res.status(200).json({ status: 'success' });
         }
 
         // ==========================================
-        // SCENARIO B: Message Status Badla Hai (Ticks: sent, delivered, read)
+        // SCENARIO B: Message Status Badla Hai (Ticks)
         // ==========================================
         if (value.statuses && value.statuses.length > 0) {
           const statusObj = value.statuses[0];
-          const wamid = statusObj.id; // Kis message ka status badla?
-          const currentStatus = statusObj.status; // 'sent', 'delivered', ya 'read'
+          const wamid = statusObj.id; 
+          const currentStatus = statusObj.status; 
 
           console.log(`🔄 Status Update: Message ${wamid} is now ${currentStatus}`);
 
-          // Firestore mein us message ko dhoondo jiska 'wamid' ye hai
           const messagesRef = collection(db, "users", userId, "messages");
           const q = query(messagesRef, where("wamid", "==", wamid));
           const querySnapshot = await getDocs(q);
 
-          // Agar message mil gaya, toh uska status update kar do
           querySnapshot.forEach(async (document) => {
             await updateDoc(document.ref, { 
                 status: currentStatus,
@@ -114,7 +128,6 @@ export default async function handler(req, res) {
         }
       }
 
-      // Agar koi aur event hai (jaise typing wagaira jo official API nahi bhejta)
       return res.status(200).json({ status: 'ignored_event' });
 
     } catch (error) {
