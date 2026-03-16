@@ -7,14 +7,15 @@ import AIIntegration from '../components/setup/AIIntegration';
 import Contacts from '../components/Contacts';
 import AccountSettings from '../components/AccountSettings';
 import { Menu, Loader2 } from 'lucide-react';
+import { toast } from 'sonner'; // Naya import
 
 const Inbox = dynamic(() => import('../components/Inbox'), { ssr: false });
 const FlowBuilder = dynamic(() => import('../components/FlowBuilder'), { ssr: false });
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile ke liye
-  const [isCollapsed, setIsCollapsed] = useState(false); // Desktop shrink ke liye (Naya Logic)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -24,6 +25,10 @@ export default function Dashboard() {
       router.push('/login');
     } else {
       setLoading(false);
+      // Example Toast: Jab dashboard load ho
+      toast.success("BaseKey Secure Link Established", {
+        description: "Your automation engine is ready."
+      });
     }
   }, [router]);
 
@@ -36,8 +41,6 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-screen bg-zinc-50 dark:bg-[#080808] overflow-hidden text-zinc-900 dark:text-white font-sans transition-all duration-500">
-      
-      {/* SIDEBAR WRAPPER (Dynamic width: w-20 ya w-64) */}
       <div className={`fixed inset-y-0 left-0 z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'}`}>
         <Sidebar 
           setActiveTab={(tab) => { setActiveTab(tab); setIsSidebarOpen(false); }} 
@@ -51,7 +54,6 @@ export default function Dashboard() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>
       )}
 
-      {/* MAIN CONTENT AREA */}
       <main className="flex-1 flex flex-col overflow-hidden relative transition-all duration-300">
         <div className="md:hidden flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0a0a0a]">
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-zinc-500"><Menu size={24} /></button>
