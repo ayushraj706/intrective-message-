@@ -2,68 +2,83 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, doc, getDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import axios from "axios";
 
-// --- SABSE JARURI: Firebase Config (Ek bhi line miss mat karna) ---
+// --- SABSE JARURI: HARDCODED CONFIG (Fix for ProjectId error) ---
 const firebaseConfig = {
   apiKey: "AIzaSyCDmDsi_JMQgx_QO4p8bnvfh-vKdN4Bmk8",
   authDomain: "success-points.firebaseapp.com",
   databaseURL: "https://success-points-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "success-points", // <--- YE LINE MISSING THI!
+  projectId: "success-points", // <--- Ye line Vercel ko chahiye hi chahiye
   storageBucket: "success-points.firebasestorage.app",
   messagingSenderId: "51177935348",
   appId: "1:51177935348:web:33fc4a6810790a3cbd29a1"
 };
 
-// Initialize Firebase
+// Global Firebase Instance
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  const { userId, platform, roomId, text, senderName } = req.body;
   
-  console.log(`🧠 Neural Path: Processing for ${senderName}`);
+  const { userId, platform, roomId, text, senderName } = req.body;
+  console.log(`🧠 Neural Path Start: ${senderName} on ${platform}`);
 
   try {
+    // 1. Config uthao
     const aiSnap = await getDoc(doc(db, "configs", userId, "ai", "gemini"));
-    if (!aiSnap.exists() || aiSnap.data().status !== 'active') return res.status(200).end();
+    if (!aiSnap.exists() || aiSnap.data().status !== 'active') {
+        return res.status(200).json({ msg: "AI Inactive" });
+    }
     const config = aiSnap.data();
 
-    // --- STEP 1: DYNAMIC MODEL FINDER (v1beta rasta) ---
+    // 2. MODEL DISCOVERY (Finding the most stable rasta)
     const modelsRes = await axios.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${config.apiKey}`);
-    const models = modelsRes.data.models || [];
+    const allModels = modelsRes.data.models || [];
 
-    // Priority: Stable models first
-    const bestModel = models.find(m => m.name.includes("gemini-1.5-flash"))?.name || 
-                      models.find(m => m.name.includes("gemini-1.0-pro"))?.name ||
-                      "models/gemini-1.5-flash";
+    // Priority Selection (Stable -> Basic -> Fallback)
+    const selectedModel = allModels.find(m => m.name.includes("gemini-1.5-flash"))?.name || 
+                          allModels.find(m => m.name.includes("gemini-1.0-pro"))?.name ||
+                          "models/gemini-1.5-flash";
 
-    console.log(`✅ Brain Linked: ${bestModel}`);
+    console.log(`✅ Using Model: ${selectedModel}`);
 
-    // --- STEP 2: GENERATE CONTENT ---
-    const generateUrl = `https://generativelanguage.googleapis.com/v1beta/${bestModel}:generateContent?key=${config.apiKey}`;
+    // 3. GENERATE REPLY (Direct REST call)
+    const generateUrl = `https://generativelanguage.googleapis.com/v1beta/${selectedModel}:generateContent?key=${config.apiKey}`;
     const aiResponse = await axios.post(generateUrl, {
-      contents: [{ parts: [{ text: `${config.instructions}\n\nUser: ${text}\nReply:` }] }]
+      contents: [{
+        parts: [{ text: `${config.instructions}\n\nUser: ${text}\nResponse:` }]
+      }]
     });
 
-    const aiReply = aiResponse.data.candidates[0].content.parts[0].text;
+    const aiReply = aiResponse.data.candidates?.[0]?.content?.parts?.[0]?.text || "Neural loop timed out.";
 
-    // --- STEP 3: SEND REPLY ---
+    // 4. DYNAMIC ROUTING (WhatsApp + Telegram Bot + Telegram Client)
     const protocol = req.headers['x-forwarded-proto'] || 'https';
     const baseUrl = `${protocol}://${req.headers.host}`;
-    let endpoint = platform === 'whatsapp' ? "/api/send-message" : "/api/send-telegram";
-
-    await axios.post(`${baseUrl}${endpoint}`, { userId, to: roomId, text: aiReply });
     
-    console.log("🚀 Neural Loop Success!");
+    let endpoint = "";
+    if (platform === 'whatsapp') endpoint = "/api/send-message";
+    else if (platform === 'telegram') endpoint = "/api/send-telegram"; // Bot Father wala
+    else if (platform === 'telegram-api') endpoint = "/api/send-telegram-client"; // Client/Render wala
+
+    console.log(`📤 Sending to ${platform} via ${endpoint}`);
+
+    await axios.post(`${baseUrl}${endpoint}`, {
+      userId: userId,
+      to: roomId,
+      text: aiReply
+    });
+
+    console.log("🚀 Loop Successful!");
     return res.status(200).json({ success: true });
 
   } catch (error) {
     const errorMsg = error.response?.data?.error?.message || error.message;
     console.error("🔥 Neural Crash:", errorMsg);
-    
-    // Alert the Sidebar Bell
+
+    // Save to Sidebar Notifications (Bell Icon)
     await addDoc(collection(db, "users", userId, "notifications"), {
-      title: "Firebase/AI Config Error",
+      title: `Neural Error (${platform})`,
       message: errorMsg,
       type: "error",
       status: "unread",
