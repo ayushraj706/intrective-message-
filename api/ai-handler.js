@@ -7,7 +7,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyCDmDsi_JMQgx_QO4p8bnvfh-vKdN4Bmk8",
   authDomain: "success-points.firebaseapp.com",
   databaseURL: "https://success-points-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "success-points", // FIX
+  projectId: "success-points",
   appId: "1:51177935348:web:33fc4a6810790a3cbd29a1"
 };
 
@@ -27,9 +27,17 @@ export default async function handler(req, res) {
     const config = aiSnap.data();
     if (!config.platforms[platform]) return res.status(200).end();
 
-    console.log("📡 Generating Neural Reply...");
+    // --- FIX: v1beta version specify karna ---
     const genAI = new GoogleGenerativeAI(config.apiKey);
-    const model = genAI.getGenerativeModel({ model: config.model === 'auto' ? 'gemini-1.5-flash' : config.model });
+    const modelName = config.model === 'auto' ? 'gemini-1.5-flash' : config.model;
+
+    console.log(`📡 Asking Gemini (${modelName}) via v1beta...`);
+    
+    // Yahan humne second parameter mein apiVersion pass kiya hai
+    const model = genAI.getGenerativeModel(
+        { model: modelName },
+        { apiVersion: 'v1beta' } 
+    );
     
     const result = await model.generateContent(`${config.instructions}\n\nUser: ${text}\nReply:`);
     const aiReply = result.response.text();
@@ -38,16 +46,18 @@ export default async function handler(req, res) {
     const protocol = req.headers['x-forwarded-proto'] || 'https';
     const baseUrl = `${protocol}://${req.headers.host}`;
     
-    let endpoint = platform === 'telegram-api' ? "/api/send-telegram-client" : 
-                   platform === 'whatsapp' ? "/api/send-message" : "/api/send-telegram";
+    let endpoint = "";
+    if (platform === 'telegram-api') endpoint = "/api/send-telegram-client";
+    else if (platform === 'whatsapp') endpoint = "/api/send-message";
+    else if (platform === 'telegram') endpoint = "/api/send-telegram";
 
-    console.log(`📤 Transmitting reply to ${endpoint}...`);
     await axios.post(`${baseUrl}${endpoint}`, { userId, to: roomId, text: aiReply });
     
-    console.log("🚀 Loop Complete!");
+    console.log("🚀 Neural Loop Complete!");
     return res.status(200).json({ success: true });
   } catch (error) {
     console.error("❌ Path Error:", error.message);
+    // Agar model not found error aaye toh user ko message save na ho aisa logic bhi daal sakte hain
     return res.status(500).json({ error: error.message });
   }
 }
