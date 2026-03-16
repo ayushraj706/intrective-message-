@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from '../firebase';
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
-import { Send, Search, MoreVertical, MessageSquare, Loader2, Check, CheckCheck, Clock, ChevronLeft, Paperclip, FileText, ImageIcon } from 'lucide-react';
+import { Send, Search, MoreVertical, MessageSquare, Loader2, Check, CheckCheck, Clock, ChevronLeft, Paperclip, FileText } from 'lucide-react';
 import axios from 'axios';
-import { toast } from 'sonner'; 
+import { toast } from 'sonner';
 
 const Inbox = ({ platform = 'whatsapp', onBack }) => {
   const [messages, setMessages] = useState([]);
@@ -141,7 +141,7 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
           </button>
           <div className="flex items-center gap-3 mb-5">
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white ${platform === 'telegram' ? 'bg-blue-400' : 'bg-green-500'}`}>
-                {platform === 'telegram' ? <Send size={16} /> : <MessageSquare size={16} />}
+                {platform === 'telegram' ? <Send size={16} className="-ml-0.5" /> : <MessageSquare size={16} />}
             </div>
             <h2 className="text-2xl font-black dark:text-white tracking-tighter capitalize italic">
               {platform} <span className={platform === 'telegram' ? 'text-blue-400' : 'text-green-500'}>Inbox</span>
@@ -179,14 +179,14 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
         {selectedRoom ? (
           <>
             {/* Header */}
-            <div className="px-6 py-4 border-b border-zinc-100 dark:border-white/5 flex items-center justify-between bg-white/80 dark:bg-black/60 backdrop-blur-2xl z-50">
+            <div className="px-6 py-4 border-b border-zinc-100 dark:border-white/5 flex items-center justify-between bg-white/80 dark:bg-black/60 backdrop-blur-2xl z-40">
               <div className="flex items-center gap-4">
                 <button onClick={() => setSelectedRoom(null)} className="md:hidden p-2 -ml-2 text-zinc-500"><ChevronLeft size={24} /></button>
                 <div className={`w-11 h-11 rounded-[1.2rem] flex items-center justify-center text-white font-black shadow-lg ${platform === 'telegram' ? 'bg-blue-500 shadow-blue-500/20' : 'bg-green-500 shadow-green-500/20'}`}>
                   {platform === 'telegram' ? 'TG' : 'WA'}
                 </div>
                 <div>
-                   <h3 className="font-bold text-[13px] dark:text-white truncate max-w-[250px]">{selectedRoom}</h3>
+                   <h3 className="font-bold text-[13px] dark:text-white truncate max-w-[200px] md:max-w-[250px]">{selectedRoom}</h3>
                    <div className="flex items-center gap-1.5 mt-0.5">
                      <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${platform === 'telegram' ? 'bg-blue-400' : 'bg-green-500'}`}></span>
                      <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-widest">
@@ -199,11 +199,11 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-32">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-32">
               {messages.filter(m => m.senderNumber === selectedRoom).map((m, idx) => (
                 <div key={idx} className={`flex ${m.sender === 'admin' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
                   <div className="max-w-[85%] md:max-w-[65%] group">
-                    <div className={`p-4 rounded-[1.8rem] text-[13.5px] shadow-sm ${m.sender === 'admin' ? (platform === 'telegram' ? 'bg-blue-500 text-white rounded-tr-none' : 'bg-green-600 text-white rounded-tr-none') : 'bg-white dark:bg-zinc-900 dark:text-zinc-200 rounded-tl-none border border-zinc-200/50 dark:border-white/5'}`}>
+                    <div className={`p-3.5 md:p-4 rounded-[1.8rem] text-[13.5px] shadow-sm ${m.sender === 'admin' ? (platform === 'telegram' ? 'bg-blue-500 text-white rounded-tr-none' : 'bg-green-600 text-white rounded-tr-none') : 'bg-white dark:bg-zinc-900 dark:text-zinc-200 rounded-tl-none border border-zinc-200/50 dark:border-white/5'}`}>
                       {m.mediaType === 'image' && (
                         <div className="mb-2 rounded-2xl overflow-hidden shadow-inner bg-black/10">
                           <img src={m.mediaUrl} alt="media" className="w-full max-h-80 object-cover cursor-pointer hover:scale-105 transition-transform duration-500" onClick={() => window.open(m.mediaUrl)} />
@@ -218,7 +218,7 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
                       {m.text && <p className="whitespace-pre-wrap break-words leading-relaxed">{m.text}</p>}
                     </div>
 
-                    {/* STATUS ICONS LOGIC (Updated for Telegram) */}
+                    {/* STATUS ICONS LOGIC (Updated for Ticks) */}
                     <div className={`flex items-center gap-1.5 mt-2 px-2 ${m.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
                       <span className="text-[9px] text-zinc-400 font-bold uppercase">{formatTime(m.timestamp)}</span>
                       {m.sender === 'admin' && (
@@ -226,16 +226,13 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
                           {m.status === 'sending' ? (
                             <Clock size={10} className="text-zinc-400 animate-pulse" />
                           ) : platform === 'telegram' ? (
-                            // Telegram logic: Always single blue tick if not sending
-                            <Check size={12} className="text-blue-400" title="Sent via Telegram" />
+                            // Jadu: Telegram ke liye hamesha Double Blue Tick!
+                            <CheckCheck size={13} className="text-blue-400" title="Delivered on Telegram" />
                           ) : m.status === 'read' ? (
-                            // WhatsApp read logic
                             <CheckCheck size={13} className="text-blue-400" />
                           ) : m.status === 'delivered' ? (
-                            // WhatsApp delivered logic
                             <CheckCheck size={13} className="text-zinc-400" />
                           ) : (
-                            // Default / WhatsApp sent logic
                             <Check size={12} className="text-zinc-400" />
                           )}
                         </span>
@@ -247,20 +244,20 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
               <div ref={scrollRef} />
             </div>
 
-            {/* Input Form */}
-            <div className="absolute bottom-6 left-0 right-0 px-6 z-50">
-              <form onSubmit={sendMessage} className="max-w-4xl mx-auto flex items-center gap-3 bg-white dark:bg-[#111] p-2.5 rounded-[2.5rem] border border-zinc-200 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-2xl">
+            {/* FLOATING INPUT FORM (Fixed Mobile Cutoff) */}
+            <div className="absolute bottom-2 md:bottom-6 left-0 right-0 px-3 md:px-6 z-50 pointer-events-none">
+              <form onSubmit={sendMessage} className="pointer-events-auto w-full max-w-4xl mx-auto flex items-center gap-1 md:gap-3 bg-white dark:bg-[#111] p-1.5 md:p-2.5 rounded-[2.5rem] border border-zinc-200 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-2xl">
                 <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,.pdf" />
-                <button type="button" onClick={() => fileInputRef.current.click()} disabled={fileLoading} className="p-3.5 text-zinc-400 hover:text-white hover:bg-white/5 rounded-full transition-all">
-                  {fileLoading ? <Loader2 className="animate-spin" size={20} /> : <Paperclip size={20} />}
+                <button type="button" onClick={() => fileInputRef.current.click()} disabled={fileLoading} className="p-2.5 md:p-3.5 text-zinc-400 hover:text-white hover:bg-white/5 rounded-full transition-all shrink-0">
+                  {fileLoading ? <Loader2 className="animate-spin" size={18} /> : <Paperclip size={18} />}
                 </button>
                 <input 
                   type="text" value={inputText} onChange={(e) => setInputText(e.target.value)} 
-                  placeholder={`Secure transmission via ${platform}...`}
-                  className="flex-1 bg-transparent py-3 px-2 outline-none dark:text-white text-sm font-medium" 
+                  placeholder={`Message via ${platform}...`}
+                  className="flex-1 min-w-0 bg-transparent py-3 px-2 outline-none dark:text-white text-sm font-medium" 
                 />
-                <button disabled={loading || fileLoading} className={`p-4 rounded-full text-white shadow-xl active:scale-90 transition-all flex items-center justify-center ${platform === 'telegram' ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/20' : 'bg-green-600 hover:bg-green-500 shadow-green-600/20'}`}>
-                  {loading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
+                <button disabled={loading || fileLoading} className={`p-3 md:p-4 rounded-full text-white shadow-xl active:scale-90 transition-all flex items-center justify-center shrink-0 ${platform === 'telegram' ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/20' : 'bg-green-600 hover:bg-green-500 shadow-green-600/20'}`}>
+                  {loading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} className="ml-1 md:ml-0" />}
                 </button>
               </form>
             </div>
@@ -268,7 +265,7 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-10">
              <div className={`w-28 h-28 rounded-[3rem] flex items-center justify-center mb-8 shadow-inner animate-pulse ${platform === 'telegram' ? 'bg-blue-500/5' : 'bg-green-500/5'}`}>
-                {platform === 'telegram' ? <Send size={40} className="opacity-30 text-blue-400" /> : <MessageSquare size={40} className="opacity-30 text-green-500" />}
+                {platform === 'telegram' ? <Send size={40} className="opacity-30 text-blue-400 -ml-1" /> : <MessageSquare size={40} className="opacity-30 text-green-500" />}
              </div>
              <h3 className="text-2xl font-black dark:text-white italic tracking-tighter uppercase">
                Base<span className={platform === 'telegram' ? 'text-blue-400' : 'text-green-500'}>Key</span> Neural Core
@@ -284,4 +281,4 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
 };
 
 export default Inbox;
-                
+  
