@@ -17,61 +17,57 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   const { userId, platform, roomId, text, senderName } = req.body;
   
-  console.log(`🧠 Neural Path: Processing for ${senderName}`);
+  console.log(`🧠 Neural Discovery: Searching for the most stable path...`);
 
   try {
     const aiSnap = await getDoc(doc(db, "configs", userId, "ai", "gemini"));
     if (!aiSnap.exists() || aiSnap.data().status !== 'active') return res.status(200).end();
     const config = aiSnap.data();
 
-    // --- STEP 1: DYNAMIC MODEL FINDER ---
-    // Hum seedha v1beta se models mangwa rahe hain kyunki aapki key wahin active hai
+    // --- STEP 1: GOOGLE SE MODELS KI LIST MANGWAO ---
     const modelsRes = await axios.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${config.apiKey}`);
-    const models = modelsRes.data.models || [];
+    const allModels = modelsRes.data.models || [];
 
-    // Priority Fix: flash-1.5 ko pehle dhoondo (v1beta version)
-    const bestModel = models.find(m => m.name.includes("gemini-1.5-flash"))?.name || 
-                      models.find(m => m.name.includes("gemini-1.5-pro"))?.name ||
-                      models.find(m => m.name.includes("gemini-2.0-flash"))?.name ||
-                      "models/gemini-1.5-flash";
+    // --- STEP 2: SABSE BASIC/PURANA MODEL DHOONDHO ---
+    // Hum 2.0 ko ignore karenge kyunki wo quota kha jata hai.
+    // Hum 'gemini-1.0-pro' dhoondhenge, jo sabse stable aur purana hai.
+    const stableModel = allModels.find(m => m.name.includes("gemini-1.0-pro"))?.name || 
+                        allModels.find(m => m.name.includes("gemini-1.5-pro"))?.name ||
+                        allModels.find(m => m.name.includes("gemini-1.5-flash"))?.name ||
+                        allModels[0]?.name; // Agar kuch na mile toh list ka pehla model
 
-    console.log(`✅ Brain Linked: ${bestModel} (using v1beta)`);
+    console.log(`✅ Stable Brain Selected: ${stableModel}`);
 
-    // --- STEP 2: GENERATE (Direct REST via v1beta) ---
-    let aiReply = "";
-    try {
-        const generateUrl = `https://generativelanguage.googleapis.com/v1beta/${bestModel}:generateContent?key=${config.apiKey}`;
-        const aiResponse = await axios.post(generateUrl, {
-          contents: [{ parts: [{ text: `${config.instructions}\n\nUser: ${text}\nReply:` }] }]
-        });
-        aiReply = aiResponse.data.candidates[0].content.parts[0].text;
-    } catch (e) {
-        console.log("🔄 Fallback to safe v1 path...");
-        // Agar v1beta fail hua, tabhi v1 par jao
-        const safeUrl = `https://generativelanguage.googleapis.com/v1/${bestModel}:generateContent?key=${config.apiKey}`;
-        const safeRes = await axios.post(safeUrl, {
-            contents: [{ parts: [{ text: `${config.instructions}\n\nUser: ${text}\nReply:` }] }]
-        });
-        aiReply = safeRes.data.candidates[0].content.parts[0].text;
-    }
+    // --- STEP 3: REPLY GENERATE KARO ---
+    // 'v1' endpoint use karenge purane models ke liye jo zyada stable hai
+    const generateUrl = `https://generativelanguage.googleapis.com/v1/${stableModel}:generateContent?key=${config.apiKey}`;
+    
+    const aiResponse = await axios.post(generateUrl, {
+      contents: [{
+        parts: [{ text: `${config.instructions}\n\nUser: ${text}\nReply:` }]
+      }]
+    });
 
-    // --- STEP 3: SEND BACK ---
+    const aiReply = aiResponse.data.candidates[0].content.parts[0].text;
+    console.log("✨ Response Received!");
+
+    // --- STEP 4: SEND BACK ---
     const protocol = req.headers['x-forwarded-proto'] || 'https';
     const baseUrl = `${protocol}://${req.headers.host}`;
     let endpoint = platform === 'telegram-api' ? "/api/send-telegram-client" : 
                    platform === 'whatsapp' ? "/api/send-message" : "/api/send-telegram";
 
     await axios.post(`${baseUrl}${endpoint}`, { userId, to: roomId, text: aiReply });
-    console.log("🚀 Neural Loop Complete!");
+    
     return res.status(200).json({ success: true });
 
   } catch (error) {
     const errorMsg = error.response?.data?.error?.message || error.message;
-    console.error("🔥 Final Crash:", errorMsg);
+    console.error("🔥 Neural Crash:", errorMsg);
     
-    // Notification for the bell icon
+    // Notification for Sidebar Bell
     await addDoc(collection(db, "users", userId, "notifications"), {
-      title: "Neural Path Error",
+      title: "Neural Quota Alert",
       message: errorMsg,
       type: "error",
       status: "unread",
