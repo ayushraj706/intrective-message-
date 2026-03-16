@@ -3,9 +3,8 @@ import { db, auth } from '../firebase';
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
 import { Send, Search, MoreVertical, MessageSquare, Loader2, Check, CheckCheck, Clock, ChevronLeft, Paperclip, FileText, ImageIcon } from 'lucide-react';
 import axios from 'axios';
-import { toast } from 'sonner'; // Sonner import kiya gaya
+import { toast } from 'sonner'; 
 
-// 'platform' prop default 'whatsapp' hai, par 'telegram' bhi ho sakta hai
 const Inbox = ({ platform = 'whatsapp', onBack }) => {
   const [messages, setMessages] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -27,7 +26,6 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const allMsgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      // Platform ke hisaab se messages filter karna
       const filteredMsgs = allMsgs.filter(m => {
         if (platform === 'whatsapp') return !m.platform || m.platform === 'whatsapp';
         if (platform === 'telegram') return m.platform === 'telegram';
@@ -50,13 +48,12 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
   const sendMessage = async (e) => {
     if (e) e.preventDefault();
     if (!inputText.trim()) {
-      toast.warning("Khali message nahi bhej sakte!"); // Toast UI
+      toast.warning("Khali message nahi bhej sakte!"); 
       return;
     }
     if (!selectedRoom || !currentUserId) return;
 
     const textToSend = inputText;
-    // WhatsApp mein country code aur + hatana zaroori hai, Telegram ID numbers hoti hain
     const cleanNumber = platform === 'telegram' ? selectedRoom : selectedRoom.replace(/\D/g, ''); 
     
     const tempMsg = {
@@ -64,7 +61,7 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
         text: textToSend,
         sender: 'admin',
         senderNumber: selectedRoom,
-        platform: platform, // Naya tag
+        platform: platform, 
         timestamp: { toDate: () => new Date() },
         status: 'sending' 
     };
@@ -77,7 +74,7 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
       await axios.post(apiUrl, { userId: currentUserId, to: cleanNumber, text: textToSend });
     } catch (err) { 
       console.error("Send Error", err);
-      toast.error(`Message failed to send via ${platform.toUpperCase()}`); // Error aane par Toast
+      toast.error(`Message failed to send via ${platform.toUpperCase()}`); 
     }
   };
 
@@ -87,7 +84,7 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
     if (!file || !selectedRoom) return;
 
     setFileLoading(true);
-    toast.info("Media processing started...", { duration: 2000 }); // Upload start hone par info
+    toast.info("Media processing started...", { duration: 2000 }); 
 
     const cleanNumber = platform === 'telegram' ? selectedRoom : selectedRoom.replace(/\D/g, '');
     const mediaType = file.type.startsWith('image') ? 'image' : 'document';
@@ -114,18 +111,13 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
       const cl_res = await axios.post(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`, formData);
       const finalMediaUrl = cl_res.data.secure_url;
 
-      // Note: Media sending currently setup for WhatsApp mostly, 
-      // telegram media API needs `sendPhoto` endpoint if platform is telegram. 
-      // Assuming api/send-media handles both or we fallback.
       const apiUrl = platform === 'telegram' ? '/api/send-telegram' : '/api/send-media';
-      
-      // If Telegram, we might need a dedicated media endpoint, but using generic for now
       await axios.post(apiUrl, { userId: currentUserId, to: cleanNumber, mediaUrl: finalMediaUrl, mediaType });
       
-      toast.success("Media sent successfully!"); // Success Toast
+      toast.success("Media sent successfully!"); 
     } catch (err) {
       console.error("Media Send Error", err);
-      toast.error("Failed to send media file."); // Error Toast
+      toast.error("Failed to send media file."); 
     }
     setFileLoading(false);
   };
@@ -142,35 +134,41 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
     <div className="flex h-screen bg-white dark:bg-[#080808] overflow-hidden transition-colors duration-500">
       
       {/* SIDEBAR */}
-      <div className={`w-full md:w-80 border-r border-zinc-100 dark:border-white/5 flex flex-col bg-white dark:bg-[#0a0a0a] transition-all ${selectedRoom ? 'hidden md:flex' : 'flex'}`}>
-        <div className="p-6">
+      <div className={`w-full md:w-96 border-r border-zinc-100 dark:border-white/5 flex flex-col bg-white dark:bg-[#0a0a0a] transition-all ${selectedRoom ? 'hidden md:flex' : 'flex'}`}>
+        <div className="p-6 border-b border-zinc-100 dark:border-white/5">
           <button onClick={onBack} className="text-zinc-500 hover:text-blue-500 mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest transition-all">
             <ChevronLeft size={14} /> Back to Inboxes
           </button>
-          <h2 className="text-3xl font-black dark:text-white tracking-tighter mb-5 capitalize italic">
-            {platform} <span className="text-blue-500">Inbox</span>
-          </h2>
+          <div className="flex items-center gap-3 mb-5">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white ${platform === 'telegram' ? 'bg-blue-400' : 'bg-green-500'}`}>
+                {platform === 'telegram' ? <Send size={16} /> : <MessageSquare size={16} />}
+            </div>
+            <h2 className="text-2xl font-black dark:text-white tracking-tighter capitalize italic">
+              {platform} <span className={platform === 'telegram' ? 'text-blue-400' : 'text-green-500'}>Inbox</span>
+            </h2>
+          </div>
           <div className="relative">
             <Search className="absolute left-4 top-3.5 text-zinc-400" size={16} />
-            <input placeholder="Search..." className="w-full bg-zinc-100 dark:bg-zinc-900/50 rounded-2xl py-3.5 pl-12 pr-4 text-xs outline-none dark:text-white" />
+            <input placeholder={`Search ${platform} chats...`} className="w-full bg-zinc-100 dark:bg-zinc-900/50 rounded-[1.5rem] py-3.5 pl-12 pr-4 text-xs outline-none dark:text-white transition-all focus:ring-1 focus:ring-blue-500/50" />
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 space-y-1 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-hide">
           {rooms.map(num => (
-            <button key={num} onClick={() => setSelectedRoom(num)} className={`w-full p-4 rounded-2xl flex items-center gap-4 transition-all ${selectedRoom === num ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-zinc-50 dark:hover:bg-white/5 dark:text-zinc-400'}`}>
-              <div className={`w-12 h-12 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 font-bold ${platform === 'telegram' ? 'bg-blue-400 text-white' : 'bg-green-500 text-white'}`}>
+            <button key={num} onClick={() => setSelectedRoom(num)} className={`w-full p-4 rounded-3xl flex items-center gap-4 transition-all ${selectedRoom === num ? (platform === 'telegram' ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-green-500/10 border border-green-500/20') : 'bg-zinc-50 dark:bg-[#111] border border-transparent hover:border-white/5'}`}>
+              <div className={`w-12 h-12 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 font-bold shadow-inner ${platform === 'telegram' ? 'bg-blue-500 text-white' : 'bg-green-500 text-white'}`}>
                  {platform === 'telegram' ? 'TG' : num.slice(0, 2)}
               </div>
               <div className="text-left flex-1 overflow-hidden">
-                <p className="font-bold text-sm truncate">{num}</p>
-                <p className="text-[9px] opacity-60 font-black uppercase tracking-widest">{platform}</p>
+                <p className={`font-bold text-[13px] truncate ${selectedRoom === num ? 'text-zinc-900 dark:text-white' : 'text-zinc-700 dark:text-zinc-300'}`}>{num}</p>
+                <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${selectedRoom === num ? (platform === 'telegram' ? 'text-blue-400' : 'text-green-500') : 'text-zinc-500'}`}>{platform}</p>
               </div>
             </button>
           ))}
           {rooms.length === 0 && (
-             <div className="p-10 text-center opacity-30 font-bold text-[10px] uppercase tracking-widest">
-               No messages in {platform} yet
+             <div className="p-10 flex flex-col items-center justify-center text-center opacity-40">
+               {platform === 'telegram' ? <Send size={32} className="mb-4 text-blue-400" /> : <MessageSquare size={32} className="mb-4 text-green-500" />}
+               <p className="font-bold text-[10px] uppercase tracking-[0.2em]">No messages yet</p>
              </div>
           )}
         </div>
@@ -180,54 +178,65 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
       <div className={`flex-1 flex flex-col bg-zinc-50 dark:bg-[#050505] relative ${!selectedRoom ? 'hidden md:flex' : 'flex'}`}>
         {selectedRoom ? (
           <>
-            <div className="px-6 py-4 border-b border-zinc-100 dark:border-white/5 flex items-center justify-between bg-white/80 dark:bg-black/60 backdrop-blur-xl z-50">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-zinc-100 dark:border-white/5 flex items-center justify-between bg-white/80 dark:bg-black/60 backdrop-blur-2xl z-50">
               <div className="flex items-center gap-4">
-                <button onClick={() => setSelectedRoom(null)} className="md:hidden p-2 text-zinc-500"><ChevronLeft size={24} /></button>
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black shadow-lg ${platform === 'telegram' ? 'bg-blue-400 shadow-blue-400/20' : 'bg-green-500 shadow-green-500/20'}`}>
+                <button onClick={() => setSelectedRoom(null)} className="md:hidden p-2 -ml-2 text-zinc-500"><ChevronLeft size={24} /></button>
+                <div className={`w-11 h-11 rounded-[1.2rem] flex items-center justify-center text-white font-black shadow-lg ${platform === 'telegram' ? 'bg-blue-500 shadow-blue-500/20' : 'bg-green-500 shadow-green-500/20'}`}>
                   {platform === 'telegram' ? 'TG' : 'WA'}
                 </div>
                 <div>
-                   <h3 className="font-bold text-sm dark:text-white truncate max-w-[200px]">{selectedRoom}</h3>
-                   <p className={`text-[8px] font-bold uppercase tracking-widest animate-pulse ${platform === 'telegram' ? 'text-blue-400' : 'text-green-500'}`}>
-                     {platform} Active Link
-                   </p>
+                   <h3 className="font-bold text-[13px] dark:text-white truncate max-w-[250px]">{selectedRoom}</h3>
+                   <div className="flex items-center gap-1.5 mt-0.5">
+                     <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${platform === 'telegram' ? 'bg-blue-400' : 'bg-green-500'}`}></span>
+                     <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-widest">
+                       Active Secure Link
+                     </p>
+                   </div>
                 </div>
               </div>
-              <MoreVertical size={20} className="text-zinc-400 cursor-pointer" />
+              <MoreVertical size={20} className="text-zinc-400 cursor-pointer hover:text-white transition-colors" />
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-5 pb-32">
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-32">
               {messages.filter(m => m.senderNumber === selectedRoom).map((m, idx) => (
                 <div key={idx} className={`flex ${m.sender === 'admin' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-                  <div className="max-w-[85%] md:max-w-[70%]">
-                    <div className={`p-3.5 rounded-2xl text-[14px] shadow-sm ${m.sender === 'admin' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white dark:bg-zinc-900 dark:text-zinc-200 rounded-tl-none border border-zinc-200/50 dark:border-white/5'}`}>
+                  <div className="max-w-[85%] md:max-w-[65%] group">
+                    <div className={`p-4 rounded-[1.8rem] text-[13.5px] shadow-sm ${m.sender === 'admin' ? (platform === 'telegram' ? 'bg-blue-500 text-white rounded-tr-none' : 'bg-green-600 text-white rounded-tr-none') : 'bg-white dark:bg-zinc-900 dark:text-zinc-200 rounded-tl-none border border-zinc-200/50 dark:border-white/5'}`}>
                       {m.mediaType === 'image' && (
-                        <div className="mb-1 rounded-xl overflow-hidden shadow-inner bg-black/5">
+                        <div className="mb-2 rounded-2xl overflow-hidden shadow-inner bg-black/10">
                           <img src={m.mediaUrl} alt="media" className="w-full max-h-80 object-cover cursor-pointer hover:scale-105 transition-transform duration-500" onClick={() => window.open(m.mediaUrl)} />
                         </div>
                       )}
                       {m.mediaType === 'document' && (
-                        <div className="flex items-center gap-3 bg-black/10 dark:bg-white/5 p-3 rounded-xl mb-1 cursor-pointer" onClick={() => window.open(m.mediaUrl)}>
-                          <FileText size={20} className="text-blue-400" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest truncate">Secure Document</span>
+                        <div className="flex items-center gap-3 bg-black/10 dark:bg-white/5 p-4 rounded-2xl mb-2 cursor-pointer hover:bg-black/20 transition-colors" onClick={() => window.open(m.mediaUrl)}>
+                          <FileText size={24} className={platform === 'telegram' ? 'text-blue-100' : 'text-green-100'} />
+                          <span className="text-[10px] font-bold uppercase tracking-widest truncate">Open Secure Document</span>
                         </div>
                       )}
                       {m.text && <p className="whitespace-pre-wrap break-words leading-relaxed">{m.text}</p>}
                     </div>
 
-                    {/* STATUS ICONS LOGIC */}
-                    <div className={`flex items-center gap-1.5 mt-1.5 px-1 ${m.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
+                    {/* STATUS ICONS LOGIC (Updated for Telegram) */}
+                    <div className={`flex items-center gap-1.5 mt-2 px-2 ${m.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
                       <span className="text-[9px] text-zinc-400 font-bold uppercase">{formatTime(m.timestamp)}</span>
                       {m.sender === 'admin' && (
                         <span className="transition-all">
                           {m.status === 'sending' ? (
                             <Clock size={10} className="text-zinc-400 animate-pulse" />
+                          ) : platform === 'telegram' ? (
+                            // Telegram logic: Always single blue tick if not sending
+                            <Check size={12} className="text-blue-400" title="Sent via Telegram" />
                           ) : m.status === 'read' ? (
-                            <CheckCheck size={13} className="text-blue-500" />
+                            // WhatsApp read logic
+                            <CheckCheck size={13} className="text-blue-400" />
                           ) : m.status === 'delivered' ? (
+                            // WhatsApp delivered logic
                             <CheckCheck size={13} className="text-zinc-400" />
                           ) : (
-                            <Check size={11} className="text-zinc-400" />
+                            // Default / WhatsApp sent logic
+                            <Check size={12} className="text-zinc-400" />
                           )}
                         </span>
                       )}
@@ -238,30 +247,35 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
               <div ref={scrollRef} />
             </div>
 
+            {/* Input Form */}
             <div className="absolute bottom-6 left-0 right-0 px-6 z-50">
-              <form onSubmit={sendMessage} className="max-w-4xl mx-auto flex items-center gap-3 bg-white dark:bg-[#111] p-2.5 rounded-[2.5rem] border border-zinc-200 dark:border-white/10 shadow-2xl backdrop-blur-xl">
+              <form onSubmit={sendMessage} className="max-w-4xl mx-auto flex items-center gap-3 bg-white dark:bg-[#111] p-2.5 rounded-[2.5rem] border border-zinc-200 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-2xl">
                 <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,.pdf" />
-                <button type="button" onClick={() => fileInputRef.current.click()} disabled={fileLoading} className="p-3 text-zinc-400 hover:text-blue-500 hover:bg-blue-500/10 rounded-full transition-all">
+                <button type="button" onClick={() => fileInputRef.current.click()} disabled={fileLoading} className="p-3.5 text-zinc-400 hover:text-white hover:bg-white/5 rounded-full transition-all">
                   {fileLoading ? <Loader2 className="animate-spin" size={20} /> : <Paperclip size={20} />}
                 </button>
                 <input 
                   type="text" value={inputText} onChange={(e) => setInputText(e.target.value)} 
-                  placeholder={`Message via ${platform}...`}
-                  className="flex-1 bg-transparent py-2 px-1 outline-none dark:text-white text-sm" 
+                  placeholder={`Secure transmission via ${platform}...`}
+                  className="flex-1 bg-transparent py-3 px-2 outline-none dark:text-white text-sm font-medium" 
                 />
-                <button disabled={loading || fileLoading} className="bg-blue-600 hover:bg-blue-500 p-3.5 rounded-full text-white shadow-xl shadow-blue-600/20 active:scale-90 transition-all">
-                  <Send size={18} />
+                <button disabled={loading || fileLoading} className={`p-4 rounded-full text-white shadow-xl active:scale-90 transition-all flex items-center justify-center ${platform === 'telegram' ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/20' : 'bg-green-600 hover:bg-green-500 shadow-green-600/20'}`}>
+                  {loading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
                 </button>
               </form>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-center p-10">
-             <div className="w-24 h-24 bg-zinc-100 dark:bg-zinc-900 rounded-[2.5rem] flex items-center justify-center mb-6 shadow-inner animate-pulse">
-                <MessageSquare size={40} className={`opacity-20 ${platform === 'telegram' ? 'text-blue-400' : 'text-green-500'}`} />
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-10">
+             <div className={`w-28 h-28 rounded-[3rem] flex items-center justify-center mb-8 shadow-inner animate-pulse ${platform === 'telegram' ? 'bg-blue-500/5' : 'bg-green-500/5'}`}>
+                {platform === 'telegram' ? <Send size={40} className="opacity-30 text-blue-400" /> : <MessageSquare size={40} className="opacity-30 text-green-500" />}
              </div>
-             <h3 className="text-xl font-black dark:text-white italic tracking-tighter uppercase">Base<span className={platform === 'telegram' ? 'text-blue-400' : 'text-green-500'}>Key</span> Control</h3>
-             <p className="text-[10px] font-bold uppercase tracking-[0.4em] mt-3 opacity-40">Awaiting {platform} selection</p>
+             <h3 className="text-2xl font-black dark:text-white italic tracking-tighter uppercase">
+               Base<span className={platform === 'telegram' ? 'text-blue-400' : 'text-green-500'}>Key</span> Neural Core
+             </h3>
+             <p className="text-[10px] font-bold uppercase tracking-[0.4em] mt-3 opacity-40">
+               Awaiting {platform} Selection
+             </p>
           </div>
         )}
       </div>
@@ -270,4 +284,4 @@ const Inbox = ({ platform = 'whatsapp', onBack }) => {
 };
 
 export default Inbox;
-    
+                
