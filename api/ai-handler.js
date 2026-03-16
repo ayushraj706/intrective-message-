@@ -1,10 +1,20 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, doc, getDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
 import axios from "axios";
 
-// Firebase Config (Same as before)
-const firebaseConfig = { /* ... aapka config ... */ };
+// --- FULL FIREBASE CONFIG (Wahi jo webhook mein hai) ---
+const firebaseConfig = {
+  apiKey: "AIzaSyCDmDsi_JMQgx_QO4p8bnvfh-vKdN4Bmk8",
+  authDomain: "success-points.firebaseapp.com",
+  databaseURL: "https://success-points-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "success-points", // YAHAN GALTI THI
+  storageBucket: "success-points.firebasestorage.app",
+  messagingSenderId: "51177935348",
+  appId: "1:51177935348:web:33fc4a6810790a3cbd29a1"
+};
+
+// Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 
@@ -14,36 +24,53 @@ export default async function handler(req, res) {
   const { userId, platform, roomId, text, senderName } = req.body;
 
   try {
-    // 1. Firebase se AI Config uthao
-    const aiSnap = await getDoc(doc(db, "configs", userId, "ai", "gemini"));
-    if (!aiSnap.exists() || aiSnap.data().status !== 'active') return res.status(200).json({ msg: "AI Disabled" });
+    // 1. Firebase se Config uthao
+    const aiRef = doc(db, "configs", userId, "ai", "gemini");
+    const aiSnap = await getDoc(aiRef);
 
-    const aiConfig = aiSnap.data();
+    if (!aiSnap.exists() || aiSnap.data().status !== 'active') {
+      return res.status(200).json({ msg: "AI Inactive or Not Found" });
+    }
 
-    // 2. Check karo ki kya is platform par AI enabled hai
-    if (!aiConfig.platforms[platform]) return res.status(200).json({ msg: "Platform Disabled" });
+    const config = aiSnap.data();
 
-    // 3. Gemini Call
-    const genAI = new GoogleGenerativeAI(aiConfig.apiKey);
-    const modelName = aiConfig.model === 'auto' ? 'gemini-1.5-flash' : aiConfig.model;
+    // 2. Check Platform Enablement
+    if (!config.platforms || !config.platforms[platform]) {
+      return res.status(200).json({ msg: "Platform Disabled" });
+    }
+
+    console.log(`🤖 AI Thinking for ${senderName}...`);
+
+    // 3. Gemini Setup
+    const genAI = new GoogleGenerativeAI(config.apiKey);
+    const modelName = config.model === 'auto' ? 'gemini-1.5-flash' : config.model;
     const model = genAI.getGenerativeModel({ model: modelName });
 
-    const prompt = `${aiConfig.instructions}\n\nUser (${senderName}) said: ${text}\nReply:`;
-    const result = await model.generateContent(prompt);
-    const aiReply = result.response.text();
+    // 4. Prompt Engineering
+    const finalPrompt = `${config.instructions}\n\nUser (${senderName}): ${text}\nResponse:`;
+    
+    const result = await model.generateContent(finalPrompt);
+    const responseText = result.response.text();
 
-    // 4. Action: Usi Inbox mein message bhejo
-    let apiUrl = '';
-    if (platform === 'whatsapp') apiUrl = `https://${req.headers.host}/api/send-message`;
-    if (platform === 'telegram') apiUrl = `https://${req.headers.host}/api/send-telegram`;
-    if (platform === 'telegram-api') apiUrl = `https://${req.headers.host}/api/send-telegram-client`;
+    // 5. Trigger Sending API
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const baseUrl = `${protocol}://${req.headers.host}`;
+    
+    let endpoint = "";
+    if (platform === 'telegram-api') endpoint = "/api/send-telegram-client";
+    else if (platform === 'telegram') endpoint = "/api/send-telegram";
+    else if (platform === 'whatsapp') endpoint = "/api/send-message";
 
-    await axios.post(apiUrl, { userId, to: roomId, text: aiReply });
+    await axios.post(`${baseUrl}${endpoint}`, {
+      userId: userId,
+      to: roomId,
+      text: responseText
+    });
 
-    return res.status(200).json({ success: true, reply: aiReply });
+    return res.status(200).json({ success: true, reply: responseText });
 
   } catch (error) {
-    console.error("AI Error:", error);
+    console.error("❌ AI Handler Error:", error.message);
     return res.status(500).json({ error: error.message });
   }
 }
