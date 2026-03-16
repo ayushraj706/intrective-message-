@@ -7,7 +7,6 @@ import UserProfile from './UserProfile';
 
 const Sidebar = ({ setActiveTab, activeTab, isCollapsed, setIsCollapsed }) => {
   return (
-    // Width ab dashboard.js control kar raha hai, isliye yahan w-full use kiya hai
     <div className={`w-full h-full bg-white dark:bg-[#1a1c1e] text-zinc-500 dark:text-gray-400 flex flex-col border-r border-zinc-200 dark:border-gray-800 shadow-xl transition-all duration-300`}>
       
       {/* Brand Logo */}
@@ -53,8 +52,9 @@ const Sidebar = ({ setActiveTab, activeTab, isCollapsed, setIsCollapsed }) => {
         </button>
       </div>
 
-      {/* --- USER PROFILE SECTION --- */}
-      <div className={`p-4 border-t border-zinc-100 dark:border-gray-800 overflow-hidden flex ${isCollapsed ? 'justify-center' : ''}`}>
+      {/* --- USER PROFILE SECTION (FIXED) --- */}
+      <div className={`p-4 border-t border-zinc-100 dark:border-gray-800 flex relative z-[100] ${isCollapsed ? 'justify-center' : ''}`}>
+        {/* 'overflow-hidden' hata diya taaki popup bahar nikal sake */}
         <div className={isCollapsed ? 'w-10' : 'w-full'}>
             <UserProfile isCollapsed={isCollapsed} />
         </div>
@@ -67,7 +67,7 @@ const Sidebar = ({ setActiveTab, activeTab, isCollapsed, setIsCollapsed }) => {
 const NavItem = ({ icon, label, active, onClick, isCollapsed }) => (
   <button 
     onClick={onClick}
-    title={isCollapsed ? label : ""} // Collapse hone par hover text dikhayega
+    title={isCollapsed ? label : ""} 
     className={`w-full flex items-center gap-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isCollapsed ? 'justify-center px-0' : 'px-4'}
       ${active 
         ? 'bg-zinc-100 dark:bg-[#27292d] text-blue-600 dark:text-white shadow-sm border border-zinc-200 dark:border-white/5' 
@@ -80,3 +80,4 @@ const NavItem = ({ icon, label, active, onClick, isCollapsed }) => (
 );
 
 export default Sidebar;
+          
