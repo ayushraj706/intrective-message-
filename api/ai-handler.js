@@ -27,28 +27,41 @@ export default async function handler(req, res) {
     // --- STEP 1: DYNAMIC MODEL DISCOVERY (Direct Fetch) ---
     console.log("🔍 Fetching active models from Google...");
     const modelsResponse = await axios.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${config.apiKey}`);
-    const models = modelsResponse.data.models || [];
+    const availableModels = modelsResponse.data.models || [];
 
-    // Sabse pehle Flash 1.5 dhoondo, phir 2.0, phir Pro
-    const selectedModel = models.find(m => m.name.includes("gemini-1.5-flash"))?.name || 
-                          models.find(m => m.name.includes("gemini-2.0-flash"))?.name ||
-                          models.find(m => m.name.includes("pro"))?.name ||
-                          "models/gemini-1.5-flash"; // Ultimate Fallback
+    // Sirf wahi models uthao jo content generate kar sakte hain
+    const validModels = availableModels.filter(m => m.supportedGenerationMethods.includes("generateContent"));
 
-    console.log(`✅ Brain selected model: ${selectedModel}`);
+    // PRIORITY LOGIC: gemini-1.5-flash ko sabse pehle rakhenge kyunki iska quota zyada stable hai
+    // gemini-2.0-flash hamesha naye keys par '0 limit' deta hai
+    const selectedModel = validModels.find(m => m.name.includes("gemini-1.5-flash"))?.name || 
+                          validModels.find(m => m.name.includes("gemini-1.5-pro"))?.name ||
+                          validModels.find(m => m.name.includes("gemini-2.0-flash"))?.name ||
+                          validModels[0]?.name || "models/gemini-1.5-flash";
 
-    // --- STEP 2: GENERATE CONTENT (Direct REST API) ---
-    // Hum SDK use nahi kar rahe taaki version ka error hi na aaye
-    const generateUrl = `https://generativelanguage.googleapis.com/v1beta/${selectedModel}:generateContent?key=${config.apiKey}`;
-    
-    const aiResponse = await axios.post(generateUrl, {
-      contents: [{
-        parts: [{ text: `${config.instructions}\n\nUser: ${text}\nReply:` }]
-      }]
-    });
+    console.log(`✅ Brain selected stable model: ${selectedModel}`);
 
-    const aiReply = aiResponse.data.candidates[0].content.parts[0].text;
-    console.log("✨ Neural Response Generated!");
+    // --- STEP 2: GENERATE CONTENT WITH FALLBACK ---
+    let aiReply = "";
+    try {
+        const generateUrl = `https://generativelanguage.googleapis.com/v1beta/${selectedModel}:generateContent?key=${config.apiKey}`;
+        const aiResponse = await axios.post(generateUrl, {
+          contents: [{
+            parts: [{ text: `${config.instructions}\n\nUser: ${text}\nReply:` }]
+          }]
+        });
+        aiReply = aiResponse.data.candidates[0].content.parts[0].text;
+        console.log("✨ Neural Response Generated!");
+    } catch (genError) {
+        // Agar Quota Limit (429) ya koi Model Error aaye, toh turant backup model try karo
+        console.log("🔄 Model failed or Quota full. Trying fallback (1.5-flash)...");
+        const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${config.apiKey}`;
+        const fallbackRes = await axios.post(fallbackUrl, {
+            contents: [{ parts: [{ text: `${config.instructions}\n\nUser: ${text}\nReply:` }] }]
+        });
+        aiReply = fallbackRes.data.candidates[0].content.parts[0].text;
+        console.log("✨ Fallback Response Success!");
+    }
 
     // --- STEP 3: SEND BACK ---
     const protocol = req.headers['x-forwarded-proto'] || 'https';
@@ -66,7 +79,7 @@ export default async function handler(req, res) {
     const errorMsg = error.response?.data?.error?.message || error.message;
     console.error("🔥 Path Crash:", errorMsg);
     
-    // Bell Icon Notification
+    // Notification for the dashboard bell icon
     try {
       await addDoc(collection(db, "users", userId, "notifications"), {
         title: "AI Neural Error",
