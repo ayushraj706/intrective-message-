@@ -1,6 +1,5 @@
-// pages/api/send-telegram-client.js
 import { Api, TelegramClient } from "telegram";
-import { StringSession } from "telegram/sessions";
+import { StringSession } from "telegram/sessions/index.js"; // <--- YE CHANGE KIYA HAI (.js lagaya)
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 
@@ -22,11 +21,15 @@ export default async function handler(req, res) {
     const configSnap = await getDoc(doc(db, "configs", userId));
     const { telegramApiId, telegramApiHash, telegramSession } = configSnap.data();
 
-    const client = new TelegramClient(new StringSession(telegramSession), parseInt(telegramApiId), telegramApiHash, { connectionRetries: 5 });
+    const client = new TelegramClient(new StringSession(telegramSession), parseInt(telegramApiId), telegramApiHash, { 
+      connectionRetries: 5,
+      // Vercel ke liye connection timeout badhana pad sakta hai
+      timeout: 10000 
+    });
+    
     await client.connect();
 
-    // --- OUTGOING FIX ---
-    // Agar 'to' field mein '+' nahi hai, matlab wo ID hai. GramJS ko BigInt chahiye.
+    // --- OUTGOING FIX (BigInt Logic) ---
     let peer = to;
     if (!to.startsWith('+')) {
         peer = BigInt(to); 
@@ -34,6 +37,7 @@ export default async function handler(req, res) {
 
     const tgRes = await client.sendMessage(peer, { message: text });
     
+    // Message database mein save karna
     await addDoc(collection(db, "users", userId, "messages"), {
       text: text, 
       sender: 'admin', 
