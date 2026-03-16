@@ -17,80 +17,59 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   const { userId, platform, roomId, text, senderName } = req.body;
   
-  console.log(`🧠 Neural Discovery Started for: ${senderName}`);
-
   try {
     const aiSnap = await getDoc(doc(db, "configs", userId, "ai", "gemini"));
     if (!aiSnap.exists() || aiSnap.data().status !== 'active') return res.status(200).end();
     const config = aiSnap.data();
 
-    // --- STEP 1: DYNAMIC MODEL DISCOVERY (Direct Fetch) ---
-    console.log("🔍 Fetching active models from Google...");
-    const modelsResponse = await axios.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${config.apiKey}`);
-    const availableModels = modelsResponse.data.models || [];
+    // --- STEP 1: DYNAMIC MODEL FINDER ---
+    const modelsRes = await axios.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${config.apiKey}`);
+    const models = modelsRes.data.models || [];
 
-    // Sirf wahi models uthao jo content generate kar sakte hain
-    const validModels = availableModels.filter(m => m.supportedGenerationMethods.includes("generateContent"));
+    // Priority: 1.5-flash (Stable) -> 1.5-pro -> 2.0-flash
+    const bestModel = models.find(m => m.name.includes("gemini-1.5-flash"))?.name || 
+                      models.find(m => m.name.includes("gemini-1.5-pro"))?.name ||
+                      "models/gemini-1.5-flash";
 
-    // PRIORITY LOGIC: gemini-1.5-flash ko sabse pehle rakhenge kyunki iska quota zyada stable hai
-    // gemini-2.0-flash hamesha naye keys par '0 limit' deta hai
-    const selectedModel = validModels.find(m => m.name.includes("gemini-1.5-flash"))?.name || 
-                          validModels.find(m => m.name.includes("gemini-1.5-pro"))?.name ||
-                          validModels.find(m => m.name.includes("gemini-2.0-flash"))?.name ||
-                          validModels[0]?.name || "models/gemini-1.5-flash";
+    console.log(`✅ Brain linked to: ${bestModel}`);
 
-    console.log(`✅ Brain selected stable model: ${selectedModel}`);
-
-    // --- STEP 2: GENERATE CONTENT WITH FALLBACK ---
+    // --- STEP 2: GENERATE (With Smart Versioning) ---
     let aiReply = "";
+    // 1.5 Models ke liye 'v1' zyada stable hai
+    const apiVersion = bestModel.includes("2.0") ? "v1beta" : "v1";
+    const generateUrl = `https://generativelanguage.googleapis.com/${apiVersion}/${bestModel}:generateContent?key=${config.apiKey}`;
+
     try {
-        const generateUrl = `https://generativelanguage.googleapis.com/v1beta/${selectedModel}:generateContent?key=${config.apiKey}`;
         const aiResponse = await axios.post(generateUrl, {
-          contents: [{
-            parts: [{ text: `${config.instructions}\n\nUser: ${text}\nReply:` }]
-          }]
+          contents: [{ parts: [{ text: `${config.instructions}\n\nUser: ${text}\nReply:` }] }]
         });
         aiReply = aiResponse.data.candidates[0].content.parts[0].text;
-        console.log("✨ Neural Response Generated!");
-    } catch (genError) {
-        // Agar Quota Limit (429) ya koi Model Error aaye, toh turant backup model try karo
-        console.log("🔄 Model failed or Quota full. Trying fallback (1.5-flash)...");
-        const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${config.apiKey}`;
-        const fallbackRes = await axios.post(fallbackUrl, {
+    } catch (e) {
+        console.log("🔄 Fallback to safe v1 legacy path...");
+        // Ultimate Safe Path
+        const safeUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${config.apiKey}`;
+        const safeRes = await axios.post(safeUrl, {
             contents: [{ parts: [{ text: `${config.instructions}\n\nUser: ${text}\nReply:` }] }]
         });
-        aiReply = fallbackRes.data.candidates[0].content.parts[0].text;
-        console.log("✨ Fallback Response Success!");
+        aiReply = safeRes.data.candidates[0].content.parts[0].text;
     }
 
     // --- STEP 3: SEND BACK ---
     const protocol = req.headers['x-forwarded-proto'] || 'https';
     const baseUrl = `${protocol}://${req.headers.host}`;
-    
     let endpoint = platform === 'telegram-api' ? "/api/send-telegram-client" : 
                    platform === 'whatsapp' ? "/api/send-message" : "/api/send-telegram";
 
     await axios.post(`${baseUrl}${endpoint}`, { userId, to: roomId, text: aiReply });
-    
-    console.log("🚀 Neural Loop Complete!");
     return res.status(200).json({ success: true });
 
   } catch (error) {
     const errorMsg = error.response?.data?.error?.message || error.message;
-    console.error("🔥 Path Crash:", errorMsg);
-    
-    // Notification for the dashboard bell icon
-    try {
-      await addDoc(collection(db, "users", userId, "notifications"), {
-        title: "AI Neural Error",
-        message: `Error in ${platform}: ${errorMsg}`,
-        type: "error",
-        status: "unread",
-        platform: platform,
-        timestamp: serverTimestamp()
-      });
-    } catch (e) { console.log("Notif failed"); }
-
+    console.error("🔥 Final Crash:", errorMsg);
+    // Notification for the bell
+    await addDoc(collection(db, "users", userId, "notifications"), {
+      title: "Neural Error", message: errorMsg, type: "error", status: "unread", platform, timestamp: serverTimestamp()
+    });
     return res.status(500).json({ error: errorMsg });
   }
 }
