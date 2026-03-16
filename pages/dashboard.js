@@ -9,18 +9,19 @@ import AIIntegration from '../components/setup/AIIntegration';
 import Contacts from '../components/Contacts';
 import AccountSettings from '../components/AccountSettings';
 
-// --- SETUP PAGES IMPORTED ---
+// --- SETUP PAGES ---
 import TelegramAPISetup from '../components/setup/TelegramAPISetup';
 import TelegramBotSetup from '../components/setup/TelegramBotSetup'; 
 import WhatsAppSetup from '../components/setup/WhatsAppSetup';       
+import GmailSetup from '../components/setup/GmailSetup'; // <--- Naya Import
 
-import { Menu, Loader2, Smartphone, Globe } from 'lucide-react';
+import { Menu, Loader2, Smartphone, Globe, Mail } from 'lucide-react'; // <--- Mail icon add kiya
 
-// --- NEW INBOX COMPONENTS (DYNAMIC IMPORTS) ---
-// Dhyaan dein: Rasta ab '../components/inbox/...' hai
+// --- INBOX COMPONENTS ---
 const WhatsAppInbox = dynamic(() => import('../components/inbox/WhatsAppInbox'), { ssr: false });
 const TelegramBotInbox = dynamic(() => import('../components/inbox/TelegramBotInbox'), { ssr: false });
 const TelegramAPIInbox = dynamic(() => import('../components/inbox/TelegramAPIInbox'), { ssr: false });
+const GmailInbox = dynamic(() => import('../components/inbox/GmailInbox'), { ssr: false }); // <--- Naya Inbox
 
 const FlowBuilder = dynamic(() => import('../components/FlowBuilder'), { ssr: false });
 
@@ -44,6 +45,7 @@ export default function Dashboard() {
 
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
       if (user) {
+        // Hum "configs" doc ko listen kar rahe hain status check karne ke liye
         const unsubscribeConfig = onSnapshot(doc(db, "configs", user.uid), (docSnap) => {
           if (docSnap.exists()) {
               setSysConfig(docSnap.data());
@@ -81,7 +83,6 @@ export default function Dashboard() {
       {isSidebarOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>}
 
       <main className="flex-1 flex flex-col overflow-hidden relative transition-all duration-300">
-        {/* Mobile Header */}
         <div className="md:hidden flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0a0a0a]">
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-zinc-500"><Menu size={24} /></button>
           <span className="font-black text-lg tracking-tighter text-blue-600 italic uppercase">BaseKey</span>
@@ -110,6 +111,18 @@ export default function Dashboard() {
                    <p className="text-xs text-zinc-500 font-medium">Connect your official WhatsApp Business API</p>
                  </div>
 
+                 {/* GMAIL CARD --- NAYA ADD KIYA --- */}
+                 <div onClick={() => setInboxType(sysConfig?.gmailConnected ? 'gmail-inbox' : 'gmail-setup')} className="bg-[#111] p-8 rounded-[2rem] border border-white/5 hover:border-red-500/30 cursor-pointer transition-all hover:-translate-y-1 shadow-xl relative overflow-hidden">
+                   {sysConfig?.gmailConnected && (
+                      <div className="absolute top-4 right-4 w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_#ef4444]"></div>
+                   )}
+                   <div className="w-14 h-14 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center mb-6">
+                     <Mail size={24} className="text-zinc-300" />
+                   </div>
+                   <h3 className="text-xl font-bold text-white mb-2">Gmail Inbox</h3>
+                   <p className="text-xs text-zinc-500 font-medium">Manage and automate your Google Mails</p>
+                 </div>
+
                  {/* TELEGRAM API CARD */}
                  <div onClick={() => setInboxType(sysConfig?.telegramSession ? 'telegram-api-inbox' : 'telegram-api-setup')} className="bg-[#111] p-8 rounded-[2rem] border border-white/5 hover:border-blue-500/30 cursor-pointer transition-all hover:-translate-y-1 shadow-xl relative overflow-hidden">
                    {sysConfig?.telegramSession && (
@@ -119,7 +132,7 @@ export default function Dashboard() {
                       <Globe size={24} className="text-zinc-300" />
                    </div>
                    <h3 className="text-xl font-bold text-white mb-2">Telegram API</h3>
-                   <p className="text-xs text-zinc-500 font-medium">Integrate custom Telegram Client API (MTProto)</p>
+                   <p className="text-xs text-zinc-500 font-medium">Integrate custom Telegram Client API</p>
                  </div>
 
                  {/* TELEGRAM BOT CARD */}
@@ -138,11 +151,13 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* --- SMART ROUTING TO NEW COMPONENTS --- */}
-          
           {/* WhatsApp Route */}
           {activeTab === 'inbox' && inboxType === 'whatsapp-setup' && <WhatsAppSetup onBack={() => setInboxType(null)} />}
           {activeTab === 'inbox' && inboxType === 'whatsapp-inbox' && <WhatsAppInbox onBack={() => setInboxType(null)} />}
+
+          {/* Gmail Route --- NAYA ROUTING --- */}
+          {activeTab === 'inbox' && inboxType === 'gmail-setup' && <GmailSetup onBack={() => setInboxType(null)} />}
+          {activeTab === 'inbox' && inboxType === 'gmail-inbox' && <GmailInbox onBack={() => setInboxType(null)} />}
 
           {/* Telegram Bot Route */}
           {activeTab === 'inbox' && inboxType === 'telegram-bot-setup' && <TelegramBotSetup onBack={() => setInboxType(null)} />}
@@ -160,4 +175,5 @@ export default function Dashboard() {
       </main>
     </div>
   );
-            }
+  }
+                     
