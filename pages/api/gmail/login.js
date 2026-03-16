@@ -1,25 +1,20 @@
 import { google } from 'googleapis';
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI // Vercel wala URL yahan use hoga
-);
-
 export default async function handler(req, res) {
-  if (req.method !== 'GET') return res.status(405).end();
+  const { userId } = req.query; // Dashboard se hum userId bhejenge
 
-  const scopes = [
-    'https://www.googleapis.com/auth/gmail.modify',
-    'https://www.googleapis.com/auth/userinfo.email'
-  ];
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  );
 
   const url = oauth2Client.generateAuthUrl({
-    access_type: 'offline', // Isse Refresh Token milega
+    access_type: 'offline',
     prompt: 'consent',
-    scope: scopes,
+    state: userId, // <--- Ye Google ko batayega ki kaunsa user login kar raha hai
+    scope: ['https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/userinfo.email'],
   });
 
-  // User ko seedha Google login par bhej do
   res.redirect(url);
 }
