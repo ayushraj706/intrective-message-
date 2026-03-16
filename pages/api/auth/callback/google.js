@@ -1,8 +1,8 @@
 import { google } from 'googleapis';
-import { db } from '../../../firebase-admin'; // Aapka admin setup
+import { db } from '../../../../firebase-admin'; // 4 levels back to reach root
 
 export default async function handler(req, res) {
-  const { code, state } = req.query; // 'state' mein aap userId bhej sakte ho
+  const { code } = req.query;
 
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -13,18 +13,19 @@ export default async function handler(req, res) {
   try {
     const { tokens } = await oauth2Client.getToken(code);
     
-    // Refresh Token mil gaya! Ise Firebase mein save karo.
-    // Dhayan rakhna: userId aapko session ya state se nikalni hogi.
-    const userId = "ayush_raj_id"; // Sample ID, ise dynamic banana hoga
+    // TODO: Yahan dynamic userId nikalna hoga (Sessions ya State se)
+    // Abhi ke liye hum aapki fixed ID use kar rahe hain testing ke liye
+    const userId = "ayush_raj_id"; 
 
-    await db.collection("users").doc(userId).collection("configs").doc("gmail").set({
-      refresh_token: tokens.refresh_token,
-      email: "connected_user@gmail.com",
-      status: 'active',
+    // Firebase mein tokens aur status save karna
+    await db.collection("configs").doc(userId).set({
+      gmailConnected: true,
+      gmail_refresh_token: tokens.refresh_token,
+      gmail_email: "connected_user@gmail.com", // Baad mein oauth2Client.getToken se nikal sakte hain
       updatedAt: new Date().toISOString()
     }, { merge: true });
 
-    // Login success hone ke baad dashboard par wapas bhejo
+    console.log("✅ Gmail Linked Successfully");
     res.redirect('/dashboard?gmail=success');
 
   } catch (error) {
