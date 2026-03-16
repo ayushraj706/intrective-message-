@@ -1,52 +1,84 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
-import axios from "axios"; // <--- Naya Import
+import { getFirestore, doc, getDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
+import axios from "axios";
 
-const firebaseConfig = { /* ... aapka config ... */ };
+// --- PROJECT ID FIX: Har line hardcoded hai ---
+const firebaseConfig = {
+  apiKey: "AIzaSyCDmDsi_JMQgx_QO4p8bnvfh-vKdN4Bmk8",
+  authDomain: "success-points.firebaseapp.com",
+  databaseURL: "https://success-points-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "success-points", 
+  storageBucket: "success-points.firebasestorage.app",
+  messagingSenderId: "51177935348",
+  appId: "1:51177935348:web:33fc4a6810790a3cbd29a1"
+};
+
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
-  const { userId } = req.query;
-  const body = req.body;
+  if (req.method !== 'POST') return res.status(405).end();
+  const { userId, platform, roomId, text, senderName } = req.body;
+  
+  console.log(`🧠 Neural Discovery: Finding the most legacy/stable model for ${senderName}`);
 
   try {
-    if (body.message) {
-      const chatId = body.message.chat.id.toString();
-      const senderName = body.message.from.first_name || "TG User";
-      const text = body.message.text || "📷 Media Message";
-      const messageId = body.message.message_id.toString();
+    const aiSnap = await getDoc(doc(db, "configs", userId, "ai", "gemini"));
+    if (!aiSnap.exists() || aiSnap.data().status !== 'active') return res.status(200).end();
+    const config = aiSnap.data();
 
-      // 1. Firebase mein save (Aapka purana logic)
-      await addDoc(collection(db, "users", userId, "messages"), {
-        text: text,
-        sender: 'customer',
-        senderNumber: chatId,
-        senderName: senderName,
-        wamid: messageId,
-        platform: 'telegram',
-        timestamp: serverTimestamp(),
-        roomId: chatId,
-        status: 'received'
-      });
+    // --- STEP 1: GOOGLE SE SABHI MODELS KI LIST MANGWAO ---
+    const modelsRes = await axios.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${config.apiKey}`);
+    const allModels = modelsRes.data.models || [];
 
-      // 2. AI TRIGGER: Telegram Bot ke liye
-      const protocol = req.headers['x-forwarded-proto'] || 'https';
-      const baseUrl = `${protocol}://${req.headers.host}`;
+    // --- STEP 2: STABILITY PRIORITY (Ghatiya/Legacy First) ---
+    // Hum gemini-1.0-pro dhoondhenge kyunki ye sabse purana aur stable hai, quota error nahi deta.
+    const selectedModel = allModels.find(m => m.name.includes("gemini-1.0-pro"))?.name || 
+                          allModels.find(m => m.name.includes("gemini-1.5-flash"))?.name ||
+                          allModels.filter(m => m.supportedGenerationMethods.includes("generateContent"))[0]?.name ||
+                          "models/gemini-1.5-flash";
 
-      axios.post(`${baseUrl}/api/ai-handler`, {
-        userId: userId,
-        platform: 'telegram',
-        roomId: chatId,
-        text: text,
-        senderName: senderName
-      }).catch(e => console.log("🤖 Telegram AI Trigger Failed:", e.message));
-    }
+    console.log(`✅ Stable Brain Selected: ${selectedModel}`);
 
-    return res.status(200).json({ ok: true });
+    // --- STEP 3: GENERATE CONTENT (v1 use karenge stable response ke liye) ---
+    // Agar model 1.0 ya 1.5 hai toh v1 endpoint sabse best hai
+    const apiVersion = selectedModel.includes("2.0") ? "v1beta" : "v1";
+    const generateUrl = `https://generativelanguage.googleapis.com/${apiVersion}/${selectedModel}:generateContent?key=${config.apiKey}`;
+    
+    const aiResponse = await axios.post(generateUrl, {
+      contents: [{ parts: [{ text: `${config.instructions}\n\nUser: ${text}\nReply:` }] }]
+    });
+
+    const aiReply = aiResponse.data.candidates[0].content.parts[0].text;
+
+    // --- STEP 4: DYNAMIC ROUTING (WhatsApp / Telegram Bot / Telegram Client) ---
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const baseUrl = `${protocol}://${req.headers.host}`;
+    
+    let endpoint = "";
+    if (platform === 'whatsapp') endpoint = "/api/send-message";
+    else if (platform === 'telegram') endpoint = "/api/send-telegram"; // Bot API
+    else if (platform === 'telegram-api') endpoint = "/api/send-telegram-client"; // Client API
+
+    console.log(`📤 Forwarding to ${platform} via ${endpoint}`);
+    await axios.post(`${baseUrl}${endpoint}`, { userId, to: roomId, text: aiReply });
+    
+    return res.status(200).json({ success: true });
+
   } catch (error) {
-    console.error("TG Webhook Error:", error);
-    return res.status(500).json({ error: 'Server Error' });
+    const errorMsg = error.response?.data?.error?.message || error.message;
+    console.error("🔥 Path Failure:", errorMsg);
+    
+    // Notification for the Sidebar Bell
+    await addDoc(collection(db, "users", userId, "notifications"), {
+      title: "Neural Path Error",
+      message: errorMsg,
+      type: "error",
+      status: "unread",
+      platform: platform,
+      timestamp: serverTimestamp()
+    });
+
+    return res.status(500).json({ error: errorMsg });
   }
 }
