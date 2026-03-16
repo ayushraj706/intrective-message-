@@ -28,7 +28,8 @@
     "autoprefixer": "^10.4.19",
     "formidable": "^3.5.1",
     "pdf-parse": "^1.1.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "@google/generative-ai": "^0.3.0"
   },
   "devDependencies": {
     "vercel": "latest"
