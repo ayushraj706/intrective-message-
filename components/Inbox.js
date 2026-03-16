@@ -34,7 +34,7 @@ const Inbox = () => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, selectedRoom]);
 
-  // --- TEXT MESSAGE SENDING (Optimistic) ---
+  // --- TEXT MESSAGE SENDING ---
   const sendMessage = async (e) => {
     if (e) e.preventDefault();
     if (!inputText.trim() || !selectedRoom || !currentUserId) return;
@@ -42,6 +42,7 @@ const Inbox = () => {
     const textToSend = inputText;
     const cleanNumber = selectedRoom.replace(/\D/g, ''); 
     
+    // UI mein turant Ghari 🕒 dikhane ke liye
     const tempMsg = {
         id: `temp-${Date.now()}`,
         text: textToSend,
@@ -56,10 +57,11 @@ const Inbox = () => {
 
     try {
       await axios.post('/api/send-message', { userId: currentUserId, to: cleanNumber, text: textToSend });
+      // API hit hone ke baad Firebase 'sent' wala data dega aur tempMsg replace ho jayega (✓)
     } catch (err) { console.error("Send Error", err); }
   };
 
-  // --- MEDIA SENDING (Optimistic + Official WhatsApp Style) ---
+  // --- MEDIA SENDING ---
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || !selectedRoom) return;
@@ -67,11 +69,9 @@ const Inbox = () => {
     const cleanNumber = selectedRoom.replace(/\D/g, '');
     const mediaType = file.type.startsWith('image') ? 'image' : 'document';
     
-    // 1. Chat mein turant dikhao (Pre-upload preview)
     const localPreviewUrl = URL.createObjectURL(file);
-    const tempId = `temp-${Date.now()}`;
     const tempMsg = {
-        id: tempId,
+        id: `temp-${Date.now()}`,
         mediaUrl: localPreviewUrl,
         mediaType: mediaType,
         sender: 'admin',
@@ -83,7 +83,6 @@ const Inbox = () => {
     setMessages(prev => [...prev, tempMsg]);
 
     try {
-      // 2. Cloudinary Upload
       const formData = new FormData();
       formData.append('file', file);
       formData.append('upload_preset', UPLOAD_PRESET);
@@ -91,12 +90,9 @@ const Inbox = () => {
       const cl_res = await axios.post(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`, formData);
       const finalMediaUrl = cl_res.data.secure_url;
 
-      // 3. WhatsApp API Call
       await axios.post('/api/send-media', { userId: currentUserId, to: cleanNumber, mediaUrl: finalMediaUrl, mediaType });
-      
     } catch (err) {
       console.error("Media Send Error", err);
-      // Fail hone par temp message ko update kar sakte ho (Optional)
     }
   };
 
@@ -114,7 +110,7 @@ const Inbox = () => {
       {/* SIDEBAR */}
       <div className={`w-full md:w-80 border-r border-zinc-100 dark:border-white/5 flex flex-col bg-white dark:bg-[#0a0a0a] transition-all ${selectedRoom ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-6">
-          <h2 className="text-3xl font-black dark:text-white tracking-tighter mb-5 italic uppercase italic">Base<span className="text-blue-500">Key</span></h2>
+          <h2 className="text-3xl font-black dark:text-white tracking-tighter mb-5 uppercase italic">Base<span className="text-blue-500">Key</span></h2>
           <div className="relative">
             <Search className="absolute left-4 top-3.5 text-zinc-400" size={16} />
             <input placeholder="Search..." className="w-full bg-zinc-100 dark:bg-zinc-900/50 rounded-2xl py-3.5 pl-12 pr-4 text-xs outline-none dark:text-white" />
@@ -171,7 +167,7 @@ const Inbox = () => {
                       {m.text && <p className="whitespace-pre-wrap break-words leading-relaxed">{m.text}</p>}
                     </div>
 
-                    {/* STATUS ICONS LOGIC (WhatsApp Style) */}
+                    {/* STATUS ICONS LOGIC */}
                     <div className={`flex items-center gap-1.5 mt-1.5 px-1 ${m.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
                       <span className="text-[9px] text-zinc-400 font-bold uppercase">{formatTime(m.timestamp)}</span>
                       {m.sender === 'admin' && (
@@ -183,6 +179,7 @@ const Inbox = () => {
                           ) : m.status === 'delivered' ? (
                             <CheckCheck size={13} className="text-zinc-400" />
                           ) : (
+                            // Default to Single Tick if status is 'sent' or missing
                             <Check size={11} className="text-zinc-400" />
                           )}
                         </span>
@@ -194,7 +191,6 @@ const Inbox = () => {
               <div ref={scrollRef} />
             </div>
 
-            {/* FLOATING INPUT BAR */}
             <div className="absolute bottom-6 left-0 right-0 px-6 z-50">
               <form onSubmit={sendMessage} className="max-w-4xl mx-auto flex items-center gap-3 bg-white dark:bg-[#111] p-2.5 rounded-[2.5rem] border border-zinc-200 dark:border-white/10 shadow-2xl backdrop-blur-xl">
                 <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,.pdf" />
@@ -227,4 +223,4 @@ const Inbox = () => {
 };
 
 export default Inbox;
-                        
+                  
