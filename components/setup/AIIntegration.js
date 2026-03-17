@@ -1,21 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../../firebase';
 import { doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
-import { Brain, Trash2, CheckCircle2, Bot, MessageSquare, Globe, Loader2, Save, Sparkles, Info, ShieldAlert } from 'lucide-react';
+// Added Facebook and Instagram icons here
+import { Brain, Trash2, CheckCircle2, Bot, MessageSquare, Globe, Loader2, Save, Sparkles, Info, ShieldAlert, Facebook, Instagram } from 'lucide-react';
 import { toast } from 'sonner';
 
 const AIIntegration = () => {
   const [loading, setLoading] = useState(false);
   const [config, setConfig] = useState(null);
-  const [apiMeta, setApiMeta] = useState(null); // API ki details ke liye
+  const [apiMeta, setApiMeta] = useState(null);
   
   const [apiKey, setApiKey] = useState('');
   const [prompt, setPrompt] = useState('You are a helpful assistant for BaseKey Business.');
   const [selectedModel, setSelectedModel] = useState('gemini-1.5-flash');
+  
+  // Updated enabledPlatforms to include FB and Insta
   const [enabledPlatforms, setEnabledPlatforms] = useState({
     whatsapp: false,
     telegram: false,
-    'telegram-api': false
+    'telegram-api': false,
+    facebook: false,
+    instagram: false
   });
 
   const currentUserId = auth.currentUser?.uid || localStorage.getItem('admin_email');
@@ -29,7 +34,13 @@ const AIIntegration = () => {
         setApiKey(data.apiKey || '');
         setPrompt(data.instructions || '');
         setSelectedModel(data.model || 'gemini-1.5-flash');
-        setEnabledPlatforms(data.platforms || {});
+        setEnabledPlatforms(data.platforms || {
+          whatsapp: false,
+          telegram: false,
+          'telegram-api': false,
+          facebook: false,
+          instagram: false
+        });
         if (data.apiMeta) setApiMeta(data.apiMeta);
       } else {
         setConfig(null);
@@ -43,8 +54,6 @@ const AIIntegration = () => {
     setLoading(true);
     
     try {
-      // --- NEURAL VERIFICATION STEP ---
-      // Hum Google se models ki list maang rahe hain ye check karne ke liye ki key active hai ya nahi
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
       const data = await response.json();
 
@@ -53,13 +62,12 @@ const AIIntegration = () => {
         return toast.error(`Google Reject: ${data.error.message}`);
       }
 
-      // API Details nikalna (Kaun-kaun se models available hain)
       const models = data.models.map(m => m.displayName);
       const hasPro = models.some(m => m.includes("1.5 Pro"));
       const version = "v1beta / Gemini 1.5 Series";
 
       const metadata = {
-        verifiedModels: models.slice(0, 5), // Top 5 models
+        verifiedModels: models.slice(0, 5),
         tier: hasPro ? "Premium / Pro Access" : "Standard / Flash Only",
         apiVersion: version,
         lastVerified: new Date().toLocaleString()
@@ -67,7 +75,6 @@ const AIIntegration = () => {
 
       setApiMeta(metadata);
 
-      // --- SAVE TO FIREBASE ---
       await setDoc(doc(db, "configs", currentUserId, "ai", "gemini"), {
         apiKey,
         instructions: prompt,
@@ -105,7 +112,6 @@ const AIIntegration = () => {
           <p className="text-zinc-500 text-sm font-medium">Configure your Gemini brain for multi-platform automation.</p>
         </div>
 
-        {/* API STATUS BADGE */}
         {apiMeta && (
             <div className="bg-zinc-900/80 border border-white/5 p-4 rounded-3xl flex items-center gap-4 backdrop-blur-md">
                 <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-500">
@@ -121,7 +127,6 @@ const AIIntegration = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* LEFT COLUMN: SETTINGS */}
         <div className="lg:col-span-2 space-y-8">
             <div className="bg-[#111] p-8 rounded-[3rem] border border-white/5 shadow-2xl space-y-10">
                 <div className="space-y-6">
@@ -160,11 +165,14 @@ const AIIntegration = () => {
 
                 <div className="pt-6 border-t border-white/5">
                     <label className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 block mb-6">Auto-Reply Triggers</label>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {[
                             { id: 'whatsapp', label: 'WhatsApp', icon: <MessageSquare size={16}/> },
                             { id: 'telegram', label: 'Bot API', icon: <Bot size={16}/> },
-                            { id: 'telegram-api', label: 'Client API', icon: <Globe size={16}/> }
+                            { id: 'telegram-api', label: 'Client API', icon: <Globe size={16}/> },
+                            // New Facebook and Instagram Triggers
+                            { id: 'facebook', label: 'Messenger', icon: <Facebook size={16}/> },
+                            { id: 'instagram', label: 'Instagram', icon: <Instagram size={16}/> }
                         ].map(p => (
                             <div 
                                 key={p.id} onClick={() => setEnabledPlatforms({...enabledPlatforms, [p.id]: !enabledPlatforms[p.id]})}
@@ -194,7 +202,6 @@ const AIIntegration = () => {
             </div>
         </div>
 
-        {/* RIGHT COLUMN: DIAGNOSTICS */}
         <div className="space-y-6">
             <div className="bg-zinc-900/50 border border-white/5 p-8 rounded-[2.5rem] h-full">
                 <div className="flex items-center gap-3 mb-6">
@@ -234,4 +241,4 @@ const AIIntegration = () => {
 };
 
 export default AIIntegration;
-                                  
+    
