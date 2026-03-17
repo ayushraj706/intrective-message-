@@ -9,24 +9,13 @@ import AIIntegration from '../components/setup/AIIntegration';
 import Contacts from '../components/Contacts';
 import AccountSettings from '../components/AccountSettings';
 
-// --- SETUP COMPONENTS ---
-import TelegramAPISetup from '../components/setup/TelegramAPISetup';
-import TelegramBotSetup from '../components/setup/TelegramBotSetup'; 
-import WhatsAppSetup from '../components/setup/WhatsAppSetup';       
-import GmailSetup from '../components/setup/GmailSetup'; 
-import FacebookSetup from '../components/setup/FacebookSetup'; // Naya
-import InstagramSetup from '../components/setup/InstagramSetup'; // Naya
-
-import { Menu, Loader2, Smartphone, Globe, Mail, Bot, Facebook, Instagram } from 'lucide-react'; 
-
-// --- INBOX COMPONENTS (Dynamic) ---
+// --- SETUP & INBOX (Dynamic for Performance) ---
+import FacebookSetup from '../components/setup/FacebookSetup';
+const InboxBase = dynamic(() => import('../components/inbox/InboxBase'), { ssr: false });
 const WhatsAppInbox = dynamic(() => import('../components/inbox/WhatsAppInbox'), { ssr: false });
-const TelegramBotInbox = dynamic(() => import('../components/inbox/TelegramBotInbox'), { ssr: false });
-const TelegramAPIInbox = dynamic(() => import('../components/inbox/TelegramAPIInbox'), { ssr: false });
-const GmailInbox = dynamic(() => import('../components/inbox/GmailInbox'), { ssr: false });
-const InboxBase = dynamic(() => import('../components/inbox/InboxBase'), { ssr: false }); // Universal Inbox
+const WhatsAppSetup = dynamic(() => import('../components/setup/WhatsAppSetup'), { ssr: false });
 
-const FlowBuilder = dynamic(() => import('../components/FlowBuilder'), { ssr: false });
+import { Menu, Loader2, Smartphone, Globe, Mail, Bot, Facebook, Instagram, ChevronRight } from 'lucide-react'; 
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -39,138 +28,104 @@ export default function Dashboard() {
 
   useEffect(() => {
     const session = localStorage.getItem('basekey_session');
-    if (!session) {
-      router.push('/login');
-    } else {
-      setLoading(false);
-    }
+    if (!session) return router.push('/login');
+    setLoading(false);
 
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
       if (user) {
-        const unsubscribeConfig = onSnapshot(doc(db, "configs", user.email || user.uid), (docSnap) => {
-          if (docSnap.exists()) {
-              setSysConfig(docSnap.data());
-          } else {
-              setSysConfig({}); 
-          }
+        // ZAROORI: UID se listen kar rahe hain (Consistency)
+        const unsubscribeConfig = onSnapshot(doc(db, "configs", user.uid), (docSnap) => {
+          setSysConfig(docSnap.exists() ? docSnap.data() : {});
         });
         return () => unsubscribeConfig();
       }
     });
-
     return () => unsubscribeAuth();
   }, [router]);
 
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    if (tab !== 'inbox') setInboxType(null);
-    setIsSidebarOpen(false);
-  };
-
   if (loading) return (
-    <div className="h-screen bg-[#050505] flex flex-col items-center justify-center text-white gap-4 font-sans">
-      <Loader2 className="animate-spin text-blue-500" size={32} />
-      <span className="font-mono text-[10px] tracking-[0.3em] uppercase opacity-50">Neural Link Active...</span>
+    <div className="h-screen bg-[#050505] flex items-center justify-center text-white">
+      <Loader2 className="animate-spin text-blue-600" size={32} />
     </div>
   );
 
   return (
-    <div className="flex h-screen bg-zinc-50 dark:bg-[#080808] overflow-hidden text-zinc-900 dark:text-white font-sans transition-all duration-500">
+    <div className="flex h-screen bg-[#080808] text-white font-sans overflow-hidden transition-all duration-500">
       
-      <div className={`fixed inset-y-0 left-0 z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'}`}>
-        <Sidebar setActiveTab={handleTabChange} activeTab={activeTab} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
+      {/* Sidebar */}
+      <div className={`fixed inset-y-0 left-0 z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
+        <Sidebar setActiveTab={(tab) => { setActiveTab(tab); setInboxType(null); }} activeTab={activeTab} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
       </div>
 
-      <main className="flex-1 flex flex-col overflow-hidden relative transition-all duration-300">
-        <div className="md:hidden flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0a0a0a]">
-          <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-zinc-500"><Menu size={24} /></button>
-          <span className="font-black text-lg tracking-tighter text-blue-600 italic uppercase flex-1 text-center ml-4">BaseKey</span>
+      <main className="flex-1 flex flex-col relative overflow-hidden">
+        {/* Mobile Header */}
+        <div className="md:hidden flex items-center p-4 border-b border-white/5 bg-black">
+          <button onClick={() => setIsSidebarOpen(true)}><Menu size={24} /></button>
+          <span className="flex-1 text-center font-black italic uppercase text-blue-600 tracking-widest">BaseKey</span>
         </div>
 
-        <div className="flex-1 overflow-hidden relative overflow-y-auto scrollbar-hide">
+        <div className="flex-1 overflow-y-auto scrollbar-hide">
           {activeTab === 'dashboard' && <MainDashboard />}
           
           {activeTab === 'inbox' && !inboxType && (
-            <div className="p-10 md:p-16 h-full bg-[#080808] overflow-y-auto pb-40">
-               <h2 className="text-4xl font-black text-white mb-2 tracking-tighter uppercase italic">My <span className="text-blue-500">Inboxes</span></h2>
-               <p className="text-zinc-500 mb-12 text-sm font-medium">Choose a channel to start automation.</p>
+            <div className="p-12 md:p-20 max-w-6xl mx-auto">
+               <div className="mb-16">
+                 <h2 className="text-4xl font-black tracking-tighter uppercase italic mb-2">My <span className="text-blue-600">Inboxes</span></h2>
+                 <p className="text-zinc-500 font-medium tracking-tight">Active automation neural links across all platforms.</p>
+               </div>
                
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  
+                 {/* MESSENGER CARD */}
+                 <div 
+                   onClick={() => setInboxType(sysConfig?.isFbVerified ? 'messenger-inbox' : 'messenger-setup')} 
+                   className="bg-[#0c0c0c] p-8 rounded-[2rem] border border-white/5 hover:border-blue-600/30 transition-all cursor-pointer flex items-center justify-between group"
+                 >
+                   <div className="flex items-center gap-6">
+                      <div className="w-14 h-14 bg-blue-600/10 rounded-2xl flex items-center justify-center text-blue-600 border border-blue-600/20 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                        <Facebook size={24} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold italic uppercase tracking-tighter">Facebook Messenger</h3>
+                        <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mt-1">
+                          {sysConfig?.isFbVerified ? '● Connected' : '○ Setup Required'}
+                        </p>
+                      </div>
+                   </div>
+                   <ChevronRight size={18} className="text-zinc-800 group-hover:text-white transition-all" />
+                 </div>
+
                  {/* WHATSAPP CARD */}
-                 <div onClick={() => setInboxType(sysConfig?.isVerified ? 'whatsapp-inbox' : 'whatsapp-setup')} className="bg-[#111] p-10 rounded-[2.5rem] border border-white/5 hover:border-green-500/30 cursor-pointer transition-all hover:-translate-y-1 group relative overflow-hidden">
-                   <div className="w-14 h-14 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-green-500/10 transition-all">
-                     <Smartphone size={24} className="text-zinc-400 group-hover:text-green-500" />
+                 <div 
+                   onClick={() => setInboxType(sysConfig?.isVerified ? 'whatsapp-inbox' : 'whatsapp-setup')} 
+                   className="bg-[#0c0c0c] p-8 rounded-[2rem] border border-white/5 hover:border-green-500/30 transition-all cursor-pointer flex items-center justify-between group"
+                 >
+                   <div className="flex items-center gap-6">
+                      <div className="w-14 h-14 bg-green-500/10 rounded-2xl flex items-center justify-center text-green-500 border border-green-500/20 group-hover:bg-green-500 group-hover:text-white transition-all">
+                        <Smartphone size={24} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold italic uppercase tracking-tighter">WhatsApp Business</h3>
+                        <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mt-1">
+                          {sysConfig?.isVerified ? '● Connected' : '○ Setup Required'}
+                        </p>
+                      </div>
                    </div>
-                   <h3 className="text-xl font-bold text-white mb-2 italic">WhatsApp</h3>
-                   <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Connect Business API</p>
-                 </div>
-
-                 {/* MESSENGER CARD (NAYA) */}
-                 <div onClick={() => setInboxType(sysConfig?.isFbVerified ? 'messenger-inbox' : 'messenger-setup')} className="bg-[#111] p-10 rounded-[2.5rem] border border-white/5 hover:border-blue-600/30 cursor-pointer transition-all hover:-translate-y-1 group">
-                   <div className="w-14 h-14 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-blue-600/10 transition-all">
-                     <Facebook size={24} className="text-zinc-400 group-hover:text-blue-600" />
-                   </div>
-                   <h3 className="text-xl font-bold text-white mb-2 italic">Messenger</h3>
-                   <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Connect Facebook Page</p>
-                 </div>
-
-                 {/* INSTAGRAM CARD (NAYA) */}
-                 <div onClick={() => setInboxType(sysConfig?.isIgVerified ? 'instagram-inbox' : 'instagram-setup')} className="bg-[#111] p-10 rounded-[2.5rem] border border-white/5 hover:border-pink-500/30 cursor-pointer transition-all hover:-translate-y-1 group">
-                   <div className="w-14 h-14 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-pink-500/10 transition-all">
-                     <Instagram size={24} className="text-zinc-400 group-hover:text-pink-500" />
-                   </div>
-                   <h3 className="text-xl font-bold text-white mb-2 italic">Instagram</h3>
-                   <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Link IG Business</p>
-                 </div>
-
-                 {/* GMAIL CARD */}
-                 <div onClick={() => setInboxType(sysConfig?.gmailConnected ? 'gmail-inbox' : 'gmail-setup')} className="bg-[#111] p-10 rounded-[2.5rem] border border-white/5 hover:border-red-500/30 cursor-pointer transition-all hover:-translate-y-1 group">
-                   <div className="w-14 h-14 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-red-500/10 transition-all">
-                     <Mail size={24} className="text-zinc-400 group-hover:text-red-500" />
-                   </div>
-                   <h3 className="text-xl font-bold text-white mb-2 italic">Gmail</h3>
-                   <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Manage Google Mails</p>
-                 </div>
-
-                 {/* TELEGRAM API CARD */}
-                 <div onClick={() => setInboxType(sysConfig?.telegramSession ? 'telegram-api-inbox' : 'telegram-api-setup')} className="bg-[#111] p-10 rounded-[2.5rem] border border-white/5 hover:border-blue-400/30 cursor-pointer transition-all hover:-translate-y-1 group">
-                   <div className="w-14 h-14 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-blue-400/10 transition-all">
-                      <Globe size={24} className="text-zinc-300 group-hover:text-blue-400" />
-                   </div>
-                   <h3 className="text-xl font-bold text-white mb-2 italic">Telegram API</h3>
-                   <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Custom Client API</p>
-                 </div>
-
-                 {/* TELEGRAM BOT CARD */}
-                 <div onClick={() => setInboxType(sysConfig?.telegramBotToken ? 'telegram-bot-inbox' : 'telegram-bot-setup')} className="bg-[#111] p-10 rounded-[2.5rem] border border-white/5 hover:border-blue-400/30 cursor-pointer transition-all hover:-translate-y-1 group">
-                   <div className="w-14 h-14 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-blue-400/10 transition-all">
-                      <Bot size={24} className="text-zinc-300 group-hover:text-blue-400" />
-                   </div>
-                   <h3 className="text-xl font-bold text-white mb-2 italic">Telegram Bot</h3>
-                   <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Automate via BotFather</p>
+                   <ChevronRight size={18} className="text-zinc-800 group-hover:text-white transition-all" />
                  </div>
 
                </div>
             </div>
           )}
 
-          {/* RENDERING LOGIC */}
+          {/* RENDERING CORE */}
           {activeTab === 'inbox' && (
-            <>
-              {inboxType === 'whatsapp-setup' && <WhatsAppSetup onBack={() => setInboxType(null)} />}
-              {inboxType === 'whatsapp-inbox' && <WhatsAppInbox onBack={() => setInboxType(null)} />}
+            <div className="h-full">
               {inboxType === 'messenger-setup' && <FacebookSetup onBack={() => setInboxType(null)} />}
               {inboxType === 'messenger-inbox' && <InboxBase platform="facebook" themeColor="messenger" onBack={() => setInboxType(null)} />}
-              {inboxType === 'instagram-setup' && <InstagramSetup onBack={() => setInboxType(null)} />}
-              {inboxType === 'instagram-inbox' && <InboxBase platform="instagram" themeColor="blue-bot" onBack={() => setInboxType(null)} />}
-              {inboxType === 'gmail-setup' && <GmailSetup onBack={() => setInboxType(null)} />}
-              {inboxType === 'gmail-inbox' && <GmailInbox onBack={() => setInboxType(null)} />}
-              {inboxType === 'telegram-bot-setup' && <TelegramBotSetup onBack={() => setInboxType(null)} />}
-              {inboxType === 'telegram-bot-inbox' && <TelegramBotInbox onBack={() => setInboxType(null)} />}
-              {inboxType === 'telegram-api-setup' && <TelegramAPISetup onBack={() => setInboxType(null)} />}
-              {inboxType === 'telegram-api-inbox' && <TelegramAPIInbox onBack={() => setInboxType(null)} />}
-            </>
+              {inboxType === 'whatsapp-setup' && <WhatsAppSetup onBack={() => setInboxType(null)} />}
+              {inboxType === 'whatsapp-inbox' && <WhatsAppInbox onBack={() => setInboxType(null)} />}
+            </div>
           )}
 
           {activeTab === 'integration' && <AIIntegration onBack={() => setActiveTab('dashboard')} />}
