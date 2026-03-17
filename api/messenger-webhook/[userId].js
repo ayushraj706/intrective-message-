@@ -14,21 +14,23 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 
 export default async function handler(req, res) {
-  const { userId } = req.query;
+  const { userId } = req.query; // Ye wahi email/ID hai jo URL mein hai
 
-  // LOG 1: Sabse pehle ye check karega ki request aayi ya nahi
-  console.log("🚀 Webhook Triggered for User:", userId);
+  if (!userId || userId === 'undefined') {
+    return res.status(400).send("ID missing");
+  }
 
-  if (!userId || userId === 'undefined') return res.status(400).send("ID missing");
   const cleanId = decodeURIComponent(userId);
+  console.log("🚀 Webhook Request for:", cleanId);
 
-  // --- VERIFICATION (GET REQUEST) ---
+  // --- META VERIFICATION (GET) ---
   if (req.method === 'GET') {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
     try {
+      // Frontend ne document email ke naam se save kiya hai
       const userRef = doc(db, "configs", cleanId);
       const userSnap = await getDoc(userRef);
 
@@ -36,18 +38,25 @@ export default async function handler(req, res) {
         const storedToken = userSnap.data().fbVerifyToken;
         
         if (mode === 'subscribe' && token === storedToken) {
-          console.log("✅ Handshake Success!");
+          console.log(`✅ Handshake Success for ${cleanId}`);
+          
+          // Firestore mein status update karo taaki Frontend modal "Green" ho jaye
           await updateDoc(userRef, { isFbVerified: true });
-          return res.status(200).send(challenge); // Meta expects PLAIN TEXT
+          
+          return res.status(200).send(challenge);
         }
+        console.error("❌ Token Mismatch!");
+      } else {
+        console.error("❌ User Config not found in Firestore!");
       }
-      return res.status(403).send('Auth Failed');
-    } catch (e) { return res.status(500).send('Server Error'); }
+      return res.status(403).send('Verification Failed');
+    } catch (error) {
+      return res.status(500).send(error.message);
+    }
   }
 
-  // --- MESSAGE RECEIVE (POST REQUEST) ---
+  // --- MESSAGE RECEIVE (POST) ---
   if (req.method === 'POST') {
-    // Abhi ke liye sirf OK bhej rahe hain, verification ke baad isme logic dalenge
     return res.status(200).send('EVENT_RECEIVED');
   }
 
