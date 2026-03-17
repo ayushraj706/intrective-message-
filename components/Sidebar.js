@@ -52,7 +52,7 @@ const Sidebar = ({ setActiveTab, activeTab, isCollapsed, setIsCollapsed }) => {
         </div>
         
         <NavItem icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} isCollapsed={isCollapsed} />
-        <NavItem icon={<Settings size={20}/>} label="Account Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} isCollapsed={isCollapsed} />
+        <NavItem icon={<Settings size={20}/>} label="Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} isCollapsed={isCollapsed} />
       </nav>
 
       {/* --- COLLAPSE BUTTON --- */}
