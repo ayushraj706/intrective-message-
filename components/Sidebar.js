@@ -43,7 +43,7 @@ const Sidebar = ({ setActiveTab, activeTab, isCollapsed, setIsCollapsed }) => {
         <div className={`mt-8 mb-3 flex items-center ${isCollapsed ? 'justify-center' : 'px-3 justify-between'}`}>
            {!isCollapsed ? (
              <>
-               <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-600 font-bold whitespace-nowrap">Settings</label>
+               <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-600 font-bold whitespace-nowrap">Config Node</label>
                <ChevronDown size={12} className="text-zinc-400 dark:text-zinc-600" />
              </>
            ) : (
@@ -52,6 +52,7 @@ const Sidebar = ({ setActiveTab, activeTab, isCollapsed, setIsCollapsed }) => {
         </div>
         
         <NavItem icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} isCollapsed={isCollapsed} />
+        {/* Yahan update kiya hai: Account Settings se sirf Settings */}
         <NavItem icon={<Settings size={20}/>} label="Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} isCollapsed={isCollapsed} />
       </nav>
 
@@ -94,4 +95,4 @@ const NavItem = ({ icon, label, active, onClick, isCollapsed }) => (
 );
 
 export default Sidebar;
-          
+        
