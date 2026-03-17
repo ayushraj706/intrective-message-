@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Facebook, Save, Copy, Shield, Loader2, Zap, X, CheckCircle2, Globe, Info, ArrowLeft } from 'lucide-react';
 import { db, auth } from '../../firebase'; 
-import { doc, setDoc, getDoc } from 'firebase/firestore'; 
+import { doc, setDoc } from 'firebase/firestore'; 
 import { toast } from 'sonner';
 
 const FacebookSetup = ({ onBack }) => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [pageData, setPageData] = useState(null); // Meta se aaya hua data
+  const [pageData, setPageData] = useState(null);
   const uid = auth.currentUser?.uid;
 
   const [formData, setFormData] = useState({
@@ -18,7 +18,6 @@ const FacebookSetup = ({ onBack }) => {
   const [verifyToken, setVerifyToken] = useState('');
   const webhookUrl = `https://intrective-message-vercel.app/api/messenger-webhook/${uid}`;
 
-  // 1. Random Token Generate karne ka function
   const generateToken = () => `bk_fb_${Math.random().toString(36).substring(2, 12)}`;
 
   const handleVerifyAndConnect = async () => {
@@ -28,25 +27,23 @@ const FacebookSetup = ({ onBack }) => {
 
     setLoading(true);
     try {
-      // --- STEP A: META VALIDATION (Graph API) ---
-      // Hum Meta se puchenge ki ye token aur ID asli hai ya nahi
+      // --- STEP A: META VALIDATION (Stable Logic) ---
+      // Hum '/me' use kar rahe hain kyunki ye token se linked page ki info turant de deta hai
       const response = await fetch(
-        `https://graph.facebook.com/v18.0/${formData.pageId}?fields=name,about,picture,link,verification_status&access_token=${formData.pageAccessToken}`
+        `https://graph.facebook.com/v18.0/me?fields=id,name,picture&access_token=${formData.pageAccessToken}`
       );
       const data = await response.json();
 
       if (data.error) {
         setLoading(false);
+        // Agar Error #100 aaye toh matlab token mein 'pages_read_engagement' missing hai
         return toast.error(`Meta Reject: ${data.error.message}`);
       }
 
-      // Agar Meta ne "Green Signal" de diya
+      // Simplified Metadata (Sirf wahi fields jo bina review ke milti hain)
       const metadata = {
         name: data.name,
-        about: data.about || "No description available",
         profilePic: data.picture?.data?.url,
-        link: data.link,
-        verified: data.verification_status,
         lastVerified: new Date().toLocaleString()
       };
 
@@ -56,7 +53,8 @@ const FacebookSetup = ({ onBack }) => {
 
       // --- STEP B: SAVE TO FIREBASE ---
       await setDoc(doc(db, "configs", uid), {
-        ...formData,
+        pageId: formData.pageId,
+        pageAccessToken: formData.pageAccessToken,
         pageName: data.name,
         fbVerifyToken: newToken,
         isFbVerified: false,
@@ -64,8 +62,8 @@ const FacebookSetup = ({ onBack }) => {
         updatedAt: new Date()
       }, { merge: true });
 
-      setShowModal(true); // Pop-up dikhao
-      toast.success("Neural Link Verified! ✅ Page details fetched.");
+      setShowModal(true); 
+      toast.success("Neural Link Verified! ✅ Page connected.");
 
     } catch (err) {
       toast.error("Network Error: Meta connection failed.");
@@ -74,7 +72,7 @@ const FacebookSetup = ({ onBack }) => {
   };
 
   return (
-    <div className="p-8 md:p-12 bg-zinc-50 dark:bg-[#080808] h-screen overflow-y-auto">
+    <div className="p-8 md:p-12 bg-zinc-50 dark:bg-[#080808] h-screen overflow-y-auto scrollbar-hide">
       <div className="max-w-3xl mx-auto">
         <button onClick={onBack} className="text-zinc-500 hover:text-white mb-8 text-[10px] font-bold tracking-widest flex items-center gap-2 transition-all">
           <ArrowLeft size={14} /> BACK TO DASHBOARD
@@ -116,40 +114,42 @@ const FacebookSetup = ({ onBack }) => {
         </div>
       </div>
 
-      {/* POPUP MODAL (The Results) */}
+      {/* MODAL SECTION */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-xl flex items-center justify-center z-[999] p-6">
-          <div className="bg-white dark:bg-[#111] w-full max-w-xl rounded-[3rem] border border-white/10 p-10 relative shadow-[0_50px_100px_rgba(0,0,0,0.5)]">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center z-[999] p-6 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-[#111] w-full max-w-xl rounded-[3rem] border border-white/10 p-10 relative shadow-2xl">
             <button onClick={() => setShowModal(false)} className="absolute top-8 right-8 text-zinc-500 hover:text-red-500 transition-colors"><X /></button>
             
             <div className="flex items-center gap-6 mb-10">
-                <img src={pageData?.profilePic} className="w-20 h-20 rounded-[2rem] border-4 border-blue-500/20 shadow-2xl" alt="Page" />
+                <img src={pageData?.profilePic} className="w-20 h-20 rounded-[2rem] border-4 border-blue-500/20" alt="Page" />
                 <div>
                     <h3 className="text-2xl font-black text-white italic tracking-tighter uppercase">{pageData?.name}</h3>
-                    <p className="text-blue-500 text-[10px] font-bold tracking-widest uppercase">Meta Page Verified ✅</p>
+                    <p className="text-green-500 text-[10px] font-bold tracking-widest uppercase flex items-center gap-2">
+                        <CheckCircle2 size={12} /> Meta Page Linked
+                    </p>
                 </div>
             </div>
 
             <div className="space-y-6">
-              <div className="p-5 bg-black rounded-3xl border border-white/5 relative">
-                <p className="text-[9px] text-zinc-500 font-bold mb-2 uppercase tracking-widest">Neural Webhook URL</p>
+              <div className="p-5 bg-black rounded-3xl border border-white/5 relative group">
+                <p className="text-[9px] text-zinc-500 font-bold mb-2 uppercase tracking-widest">Callback URL</p>
                 <code className="text-[10px] text-blue-400 break-all font-mono">{webhookUrl}</code>
-                <button onClick={() => {navigator.clipboard.writeText(webhookUrl); toast.success("URL Copied!");}} className="absolute top-5 right-5 text-zinc-600 hover:text-white"><Copy size={14}/></button>
+                <button onClick={() => {navigator.clipboard.writeText(webhookUrl); toast.success("URL Copied!");}} className="absolute top-5 right-5 text-zinc-600 hover:text-white opacity-0 group-hover:opacity-100 transition-all"><Copy size={14}/></button>
               </div>
 
-              <div className="p-5 bg-black rounded-3xl border border-white/5 relative">
+              <div className="p-5 bg-black rounded-3xl border border-white/5 relative group">
                 <p className="text-[9px] text-zinc-500 font-bold mb-2 uppercase tracking-widest">Verify Token</p>
                 <div className="flex items-center justify-between">
                     <code className="text-2xl text-green-500 font-black tracking-tighter">{verifyToken}</code>
-                    <button onClick={() => {navigator.clipboard.writeText(verifyToken); toast.success("Token Copied!");}} className="text-zinc-600 hover:text-white"><Copy size={16}/></button>
+                    <button onClick={() => {navigator.clipboard.writeText(verifyToken); toast.success("Token Copied!");}} className="text-zinc-600 hover:text-white opacity-0 group-hover:opacity-100 transition-all"><Copy size={16}/></button>
                 </div>
               </div>
             </div>
 
-            <div className="mt-8 flex gap-3 p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl">
+            <div className="mt-8 p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl flex gap-3">
                 <Info className="text-blue-500 shrink-0" size={18} />
-                <p className="text-[10px] text-zinc-400 leading-relaxed font-medium">
-                   Bhai, ye details Meta Dashboard mein <b className="text-white">Messenger &gt; API Setup</b> mein dalo. Jab tak Meta "Green" na ho jaye, ye window band mat karna.
+                <p className="text-[10px] text-zinc-400 leading-relaxed">
+                   Ab Meta Dashboard mein <b className="text-white">Messenger &gt; API Setup</b> mein ye details dalo. "Verify and Save" hone ke baad hi ye window band karna.
                 </p>
             </div>
           </div>
@@ -160,4 +160,4 @@ const FacebookSetup = ({ onBack }) => {
 };
 
 export default FacebookSetup;
-        
+  
