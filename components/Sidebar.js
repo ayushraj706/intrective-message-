@@ -16,13 +16,13 @@ const Sidebar = ({ setActiveTab, activeTab, isCollapsed, setIsCollapsed }) => {
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center font-bold text-lg shadow-lg shadow-blue-600/20 text-white shrink-0">B</div>
           {!isCollapsed && (
-            <span className="font-bold tracking-tight text-lg uppercase italic whitespace-nowrap animate-in fade-in slide-in-from-left-4">
+            <span className="font-bold tracking-tight text-lg uppercase italic whitespace-nowrap animate-in fade-in slide-in-from-left-4 text-zinc-900 dark:text-white">
               Base<span className="text-blue-600">Key</span>
             </span>
           )}
         </div>
 
-        {/* --- BELL ICON: Sirf tab dikhega jab sidebar khula ho --- */}
+        {/* --- BELL ICON: Notification logic remains intact --- */}
         {!isCollapsed && (
           <div className="animate-in fade-in zoom-in duration-500">
             <NotificationCenter />
@@ -30,9 +30,9 @@ const Sidebar = ({ setActiveTab, activeTab, isCollapsed, setIsCollapsed }) => {
         )}
       </div>
 
-      {/* Navigation */}
+      {/* Navigation - Main Neural Paths */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-2 scrollbar-hide">
-        {!isCollapsed && <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-600 font-bold mb-3 block px-3">Main</label>}
+        {!isCollapsed && <label className="text-[10px] uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-600 font-bold mb-3 block px-3 italic">Main System</label>}
         
         <NavItem icon={<MessageSquare size={20}/>} label="My Inbox" active={activeTab === 'inbox'} onClick={() => setActiveTab('inbox')} isCollapsed={isCollapsed} />
         <NavItem icon={<Users size={20}/>} label="Contacts" active={activeTab === 'contacts'} onClick={() => setActiveTab('contacts')} isCollapsed={isCollapsed} />
@@ -52,11 +52,11 @@ const Sidebar = ({ setActiveTab, activeTab, isCollapsed, setIsCollapsed }) => {
         </div>
         
         <NavItem icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} isCollapsed={isCollapsed} />
-        {/* Yahan update kiya hai: Account Settings se sirf Settings */}
+        {/* Logic: Account Settings renamed to Settings for unified modular access */}
         <NavItem icon={<Settings size={20}/>} label="Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} isCollapsed={isCollapsed} />
       </nav>
 
-      {/* --- COLLAPSE BUTTON --- */}
+      {/* --- SIDEBAR COLLAPSE TOGGLE --- */}
       <div className="px-4 py-2 border-t border-zinc-100 dark:border-gray-800">
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
@@ -64,11 +64,11 @@ const Sidebar = ({ setActiveTab, activeTab, isCollapsed, setIsCollapsed }) => {
           title={isCollapsed ? "Expand" : "Collapse"}
         >
           {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
-          {!isCollapsed && <span className="text-sm font-bold">Collapse</span>}
+          {!isCollapsed && <span className="text-sm font-bold">Collapse Sidebar</span>}
         </button>
       </div>
 
-      {/* --- USER PROFILE SECTION --- */}
+      {/* --- FINAL FOOTER: USER PROFILE NODE --- */}
       <div className={`p-4 border-t border-zinc-100 dark:border-gray-800 flex relative z-[100] ${isCollapsed ? 'justify-center' : ''}`}>
         <div className={isCollapsed ? 'w-10' : 'w-full'}>
             <UserProfile isCollapsed={isCollapsed} />
@@ -78,7 +78,7 @@ const Sidebar = ({ setActiveTab, activeTab, isCollapsed, setIsCollapsed }) => {
   );
 };
 
-// NavItem Code (Same as before)
+// NavItem Component: Optimized for the BaseKey Neural Design
 const NavItem = ({ icon, label, active, onClick, isCollapsed }) => (
   <button 
     onClick={onClick}
@@ -95,4 +95,3 @@ const NavItem = ({ icon, label, active, onClick, isCollapsed }) => (
 );
 
 export default Sidebar;
-        
