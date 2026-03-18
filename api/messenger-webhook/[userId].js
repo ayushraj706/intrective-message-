@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, updateDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 
+// Firebase Configuration
 const firebaseConfig = { 
   apiKey: "AIzaSyCDmDsi_JMQgx_QO4p8bnvfh-vKdN4Bmk8",
   authDomain: "success-points.firebaseapp.com",
@@ -10,54 +11,102 @@ const firebaseConfig = {
   appId: "1:51177935348:web:33fc4a6810790a3cbd29a1"
 };
 
-// Error-free Initialization
+// Safe App Initialization
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 
 export default async function handler(req, res) {
-  // NEXT.JS logic: userId strictly comes from req.query
+  // URL parameters se User Email (ID) nikaalna
   const { userId } = req.query; 
-  if (!userId) return res.status(400).send("No UserID");
+  if (!userId) return res.status(400).send("Identifier Missing");
 
   const cleanId = decodeURIComponent(userId).toLowerCase().trim();
 
-  // --- GET: Meta Handshake Verification ---
+  // --- 1. GET: META HANDSHAKE (Verification) ---
   if (req.method === 'GET') {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
+    console.log(`🚀 [WEBHOOK] Handshake started for: ${cleanId}`);
+
     try {
-      // 1. Database se config dhoondo
       const userRef = doc(db, "configs", cleanId);
       const userSnap = await getDoc(userRef);
 
       if (userSnap.exists()) {
         const storedToken = userSnap.data().fbVerifyToken;
-
+        
         if (mode === 'subscribe' && token === storedToken) {
-          // 🔥 SYNC FIX: Pehle Database update karo, phir Meta ko reply do
+          // 🔥 REAL-TIME SYNC: Dashboard ko 'True' signal bhej rahe hain
           await updateDoc(userRef, { 
             isFbVerified: true,
             status: 'connected',
             lastVerified: new Date().toISOString()
           });
-
-          // Meta ko sirf challenge text bhejna hai (Important!)
+          
+          console.log(`✅ [SUCCESS] ${cleanId} verified and updated in DB.`);
           return res.status(200).send(challenge); 
+        } else {
+          console.error("❌ [ERROR] Token mismatch.");
+          return res.status(403).send('Token Mismatch');
         }
+      } else {
+        console.error(`❌ [ERROR] Config not found for: ${cleanId}`);
+        return res.status(404).send('User Not Found');
       }
-      return res.status(403).send('Verification Failed');
-    } catch (err) {
-      console.error("🔥 Webhook Error:", err.message);
-      return res.status(500).send("Internal Error");
+    } catch (e) { 
+      console.error(`🔥 [CRITICAL] Webhook Crash: ${e.message}`);
+      return res.status(500).json({ error: "Server Crash", detail: e.message }); 
     }
   }
 
-  // --- POST: Incoming Messages ---
+  // --- 2. POST: INCOMING MESSAGES (The Real Automation) ---
   if (req.method === 'POST') {
-    return res.status(200).send('EVENT_RECEIVED');
+    const body = req.body;
+
+    if (body.object === 'page') {
+      try {
+        for (const entry of body.entry) {
+          if (!entry.messaging) continue;
+          
+          const webhook_event = entry.messaging[0];
+          const senderId = webhook_event.sender.id; // Customer's FB ID
+
+          let messagePayload = {
+            senderId: senderId,
+            platform: 'facebook',
+            type: 'incoming',
+            status: 'received',
+            timestamp: serverTimestamp()
+          };
+
+          // A. Handle Text Messages
+          if (webhook_event.message?.text) {
+            messagePayload.text = webhook_event.message.text;
+          }
+
+          // B. Handle Media (Images, Audio, Video, Files)
+          if (webhook_event.message?.attachments) {
+            const attachment = webhook_event.message.attachments[0];
+            messagePayload.mediaType = attachment.type; // 'image', 'audio', 'video', 'file'
+            messagePayload.mediaUrl = attachment.payload.url;
+          }
+
+          // 🔥 Firestore mein message save karein
+          if (messagePayload.text || messagePayload.mediaUrl) {
+            await addDoc(collection(db, "users", cleanId, "messages"), messagePayload);
+            console.log(`📥 [MESSAGE] Saved from ${senderId} to ${cleanId}`);
+          }
+        }
+        return res.status(200).send('EVENT_RECEIVED');
+      } catch (err) {
+        console.error("🔥 [POST ERROR] Failed to save message:", err.message);
+        return res.status(500).send("Internal Server Error");
+      }
+    }
+    return res.status(404).send("Not a Page Event");
   }
 
-  res.status(405).end();
+  res.status(405).end(); // Method Not Allowed
 }
