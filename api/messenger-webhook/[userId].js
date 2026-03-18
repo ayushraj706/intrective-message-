@@ -17,7 +17,6 @@ export default async function handler(req, res) {
   const { userId } = req.query; 
   const cleanId = decodeURIComponent(userId || '');
 
-  // --- 1. VERIFICATION (GET) ---
   if (req.method === 'GET') {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
@@ -31,12 +30,15 @@ export default async function handler(req, res) {
         const storedToken = userSnap.data().fbVerifyToken;
         
         if (mode === 'subscribe' && token === storedToken) {
-          // 🔥 ASALI FIX: Meta ko response dene se pehle Firestore update karo
+          // 🔥 ASALI FIX: Dashboard ke liye flags update karo
           await updateDoc(userRef, { 
-            isFbVerified: true,
+            isFbVerified: true,  // Messenger ke liye
+            isVerified: true,    // WhatsApp/Global ke liye
+            isIgVerified: true,  // Instagram ke liye (Safe side)
             verifiedAt: new Date() 
           });
           
+          console.log(`✅ Handshake Success for UID: ${cleanId}`);
           return res.status(200).send(challenge); 
         }
       }
@@ -44,9 +46,8 @@ export default async function handler(req, res) {
     } catch (e) { return res.status(500).send('Error'); }
   }
 
-  // --- 2. MESSAGE RECEIVE (POST) ---
   if (req.method === 'POST') {
-    // ... (Incoming messages handling logic yahan aayega)
+    // Incoming messages logic here
     return res.status(200).send('EVENT_RECEIVED');
   }
 
