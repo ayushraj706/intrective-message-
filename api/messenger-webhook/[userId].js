@@ -10,57 +10,72 @@ const firebaseConfig = {
   appId: "1:51177935348:web:33fc4a6810790a3cbd29a1"
 };
 
-// Error check ke saath initialization
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 
 export default async function handler(req, res) {
-  const { userId } = req.query; // e.g., ayushrajayushhh@gmail.com
-  const cleanId = decodeURIComponent(userId || '');
+  const { userId } = req.query; 
+  const cleanId = decodeURIComponent(userId || '').toLowerCase().trim();
 
-  // Meta Dashboard verification ke liye (GET)
   if (req.method === 'GET') {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
-    console.log(`🔍 Handshake Request for: ${cleanId}`);
+    console.log(`🚀 [WEBHOOK START] Incoming request for ID: ${cleanId}`);
 
     try {
+      // Step 1: Document dhoondo
       const userRef = doc(db, "configs", cleanId);
+      console.log(`📂 [STEP 1] Looking for document at path: configs/${cleanId}`);
+      
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
-        console.error("❌ Document not found for:", cleanId);
-        return res.status(404).send('User Config Not Found');
+        console.error(`❌ [ERROR] Document 'configs/${cleanId}' NOT FOUND. Make sure you saved details in setup page first.`);
+        return res.status(404).json({ error: "Config document missing", path: `configs/${cleanId}` });
       }
 
-      const storedToken = userSnap.data().fbVerifyToken;
+      const data = userSnap.data();
+      const storedToken = data.fbVerifyToken;
+      console.log(`🔑 [STEP 2] Token Match Check -> Received: ${token} | Stored: ${storedToken}`);
       
       if (mode === 'subscribe' && token === storedToken) {
-        // 🔥 CRITICAL: Database update ko 'await' karna zaroori hai
-        await updateDoc(userRef, { 
-          isFbVerified: true,
-          status: 'connected',
-          lastVerified: new Date().toISOString()
-        });
+        
+        console.log(`⚙️ [STEP 3] Tokens matched! Attempting Database Update...`);
 
-        console.log(`✅ ${cleanId} is now VERIFIED in Database`);
-        return res.status(200).send(challenge); 
+        // Step 3: Database Update with detailed Error Catching
+        try {
+          await updateDoc(userRef, { 
+            isFbVerified: true,
+            status: 'active',
+            lastVerifiedAt: new Date().toISOString()
+          });
+          
+          console.log(`✅ [SUCCESS] Database updated for ${cleanId}. Handshake complete.`);
+          
+          // Meta ko success bhejo
+          return res.status(200).send(challenge);
+
+        } catch (dbError) {
+          console.error(`❌ [DB ERROR] Update failed: ${dbError.message}`);
+          return res.status(500).json({ error: "Firestore update failed", detail: dbError.message });
+        }
+
       } else {
-        console.error("❌ Token Mismatch!");
-        return res.status(403).send('Token Mismatch');
+        console.error(`❌ [ERROR] Token mismatch or invalid mode. Mode: ${mode}`);
+        return res.status(403).send('Token mismatch');
       }
-    } catch (error) {
-      console.error("🔥 Server Error during GET:", error.message);
-      return res.status(500).send('Internal Server Error');
+
+    } catch (globalError) { 
+      console.error(`🔥 [CRITICAL ERROR] Webhook crashed: ${globalError.message}`);
+      return res.status(500).json({ error: globalError.message }); 
     }
   }
 
-  // Incoming messages handle karne ke liye (POST)
+  // Messenger message receiving logic
   if (req.method === 'POST') {
+    console.log("📥 [POST] New message event received from Meta.");
     return res.status(200).send('EVENT_RECEIVED');
   }
-
-  res.status(405).end();
 }
