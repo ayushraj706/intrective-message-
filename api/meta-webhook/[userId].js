@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   const { userId } = req.query; 
   const cleanId = decodeURIComponent(userId || '').toLowerCase().trim();
 
-  // --- 1. GET: Handshake Verification (Meta Check) ---
+  // --- GET: Meta Handshake ---
   if (req.method === 'GET') {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
@@ -30,68 +30,36 @@ export default async function handler(req, res) {
       if (userSnap.exists()) {
         const storedToken = userSnap.data().fbVerifyToken;
         if (mode === 'subscribe' && token === storedToken) {
+          // 🔥 SYNC TRIGGER: Yahan true hoga tabhi dashboard badlega
           await updateDoc(userRef, { 
             isFbVerified: true, 
-            isIgVerified: true, 
-            isVerified: true,
             status: 'active',
             updatedAt: new Date().toISOString()
           });
           return res.status(200).send(challenge); 
         }
       }
-      return res.status(403).send('Verification Failed');
+      return res.status(403).send('ID mismatch');
     } catch (e) { return res.status(500).send(e.message); }
   }
 
-  // --- 2. POST: Incoming Messages (The Real Deal) ---
+  // --- POST: Message Catcher ---
   if (req.method === 'POST') {
-    const body = req.body;
-
-    // Check karo ki ye Meta Page ka event hai ya nahi
-    if (body.object === 'page') {
-      try {
-        // Meta data ko loop mein process karna padta hai
+    try {
+      const body = req.body;
+      if (body.object === 'page') {
         for (const entry of body.entry) {
           const webhook_event = entry.messaging[0];
-          const senderId = webhook_event.sender.id; // Customer ki Unique ID
-
-          let messagePayload = {
-            senderId: senderId,
+          await addDoc(collection(db, "users", cleanId, "messages"), {
+            senderId: webhook_event.sender.id,
+            text: webhook_event.message?.text || "Media Message",
             platform: 'facebook',
-            type: 'incoming', // Bahar se aaya message
-            status: 'unread',
+            type: 'incoming',
             timestamp: serverTimestamp()
-          };
-
-          // A. Handle Text Messages
-          if (webhook_event.message?.text) {
-            messagePayload.text = webhook_event.message.text;
-          }
-
-          // B. Handle Media (Images/Audio/Video)
-          if (webhook_event.message?.attachments) {
-            const attachment = webhook_event.message.attachments[0];
-            messagePayload.mediaType = attachment.type; // 'image', 'audio', etc.
-            messagePayload.mediaUrl = attachment.payload.url;
-          }
-
-          // 🔥 DATABASE MEIN SAVE: users/{email}/messages/...
-          if (messagePayload.text || messagePayload.mediaUrl) {
-            const msgRef = collection(db, "users", cleanId, "messages");
-            await addDoc(msgRef, messagePayload);
-            console.log(`📥 [SAVED] New message from ${senderId} to ${cleanId}`);
-          }
+          });
         }
-        
-        return res.status(200).send('EVENT_RECEIVED');
-      } catch (err) {
-        console.error("🔥 Webhook POST Error:", err.message);
-        return res.status(500).send("Internal Server Error");
       }
-    }
-    return res.status(404).send('Not a page event');
+      return res.status(200).send('EVENT_RECEIVED');
+    } catch (err) { return res.status(500).send("POST_ERR"); }
   }
-
-  res.status(405).end();
 }
