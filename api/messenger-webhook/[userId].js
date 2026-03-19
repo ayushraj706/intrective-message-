@@ -15,8 +15,9 @@ const db = getFirestore(app);
 
 export default async function handler(req, res) {
   const { userId } = req.query; 
-  if (!userId) return res.status(400).send("Bhai, URL mein Email/ID missing hai!");
+  if (!userId) return res.status(400).send("ID Missing");
 
+  // Strictly clean the ID (Email)
   const cleanId = decodeURIComponent(userId).toLowerCase().trim();
 
   if (req.method === 'GET') {
@@ -28,41 +29,25 @@ export default async function handler(req, res) {
       const userRef = doc(db, "configs", cleanId);
       const userSnap = await getDoc(userRef);
 
-      // --- SMART DIAGNOSTIC MODE (For Browser Hits) ---
-      if (!mode) {
-        if (!userSnap.exists()) {
-          return res.status(200).send(`❌ ERROR: Document 'configs/${cleanId}' nahi mila! Pehle setup page par save karo.`);
-        }
-        const data = userSnap.data();
-        return res.status(200).send(`
-          ✅ NODE STATUS: Online
-          📧 ID: ${cleanId}
-          🔑 Stored Token: ${data.fbVerifyToken || 'Nahi mila'}
-          📊 Verified: ${data.isFbVerified ? 'YES (Inbox khulna chahiye)' : 'NO (Verify and Save dabao)'}
-          📝 Instruction: Meta Dashboard mein yahi Token dalo aur 'Verify' dabao.
-        `);
-      }
-
-      // --- META HANDSHAKE LOGIC ---
       if (userSnap.exists()) {
         const storedToken = userSnap.data().fbVerifyToken;
 
         if (mode === 'subscribe' && token === storedToken) {
-          // 🔥 AUTO-SYNC: Bina manual mehnat ke database update
+          // 🔥 REAL-TIME FIX: Pehle Database update, phir response
           await updateDoc(userRef, { 
             isFbVerified: true,
-            status: 'connected',
+            status: 'active',
             lastVerified: new Date().toISOString()
           });
-          
+
+          console.log(`✅ Verified: ${cleanId}`);
           return res.status(200).send(challenge); 
-        } else {
-          return res.status(403).send(`Token Mismatch! Received: ${token}, Expected: ${storedToken}`);
         }
       }
-      return res.status(404).send('User Not Found in Database');
+      return res.status(403).send('Token Mismatch');
     } catch (err) {
-      return res.status(500).send(`Critical Error: ${err.message}`);
+      console.error("🔥 Webhook Error:", err.message);
+      return res.status(500).send(err.message);
     }
   }
 
