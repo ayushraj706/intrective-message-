@@ -11,7 +11,6 @@ const FacebookSetup = ({ onBack }) => {
   const [isLiveVerified, setIsLiveVerified] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   
-  // 1. MONITOR AUTH STATE
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
@@ -24,12 +23,10 @@ const FacebookSetup = ({ onBack }) => {
   }, []);
 
   const uid = currentUser?.uid;
-  // 🔥 WEBHOOK URL: Strictly using UID for the final handshake
   const webhookUrl = `https://intrective-message.vercel.app/api/messenger-webhook/${uid}`;
 
   const [formData, setFormData] = useState({ pageId: '', pageAccessToken: '' });
 
-  // 2. REAL-TIME HANDSHAKE LISTENER (Firestore Listener)
   useEffect(() => {
     let unsubscribe = () => {};
     if (showModal && uid) {
@@ -53,11 +50,9 @@ const FacebookSetup = ({ onBack }) => {
 
     setLoading(true);
     try {
-      // Unique Token for Meta Verification
       const newToken = `bk_fb_${Math.random().toString(36).substring(2, 12)}`;
       setVerifyToken(newToken);
 
-      // 🔥 SAVE TO FIRESTORE: configs/{uid}
       await setDoc(doc(db, "configs", uid), {
         pageId: formData.pageId,
         pageAccessToken: formData.pageAccessToken,
@@ -65,14 +60,12 @@ const FacebookSetup = ({ onBack }) => {
         isFbVerified: false, 
         platform: 'facebook',
         updatedAt: new Date(),
-        userId: currentUser.email // Backup info
+        userId: currentUser.email
       }, { merge: true });
 
       setShowModal(true);
-      toast.success("Configuration Uploaded");
     } catch (err) { 
-        console.error("Firebase Write Error:", err);
-        toast.error("Database Save Failed. Check Firestore Rules!"); 
+        toast.error("Database Save Failed."); 
     }
     setLoading(false);
   };
@@ -84,48 +77,35 @@ const FacebookSetup = ({ onBack }) => {
 
   return (
     <div className="p-10 bg-[#050505] min-h-screen text-white font-sans selection:bg-blue-600/30">
-      {/* HEADER */}
       <div className="max-w-5xl mx-auto flex items-center justify-between mb-16">
         <button onClick={onBack} className="flex items-center gap-2 text-zinc-600 hover:text-white transition-all text-[10px] font-black uppercase tracking-[0.4em] group">
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back to Base
         </button>
         <div className="flex items-center gap-3 px-5 py-2 bg-zinc-900/50 rounded-full border border-white/5">
-            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.6)]"></div>
+            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
             <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Node Sync Online</span>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
-        {/* LEFT: INFO */}
         <div className="space-y-6">
             <div className="w-16 h-16 bg-blue-600/10 rounded-3xl flex items-center justify-center text-blue-500 border border-blue-500/20 shadow-2xl">
                 <Facebook size={32} fill="currentColor" />
             </div>
-            <h1 className="text-6xl font-black italic uppercase tracking-tighter italic">Messenger <span className="text-blue-600">Flow</span></h1>
+            <h1 className="text-6xl font-black italic uppercase tracking-tighter">Messenger <span className="text-blue-600">Flow</span></h1>
             <p className="text-zinc-500 text-sm leading-relaxed max-w-sm">
-                Connect your Facebook Meta Node to enable AI automated responses and multimedia message handling.
+                Connect your Facebook Meta Node to enable AI automated responses.
             </p>
-            <div className="flex items-center gap-4 text-xs font-bold text-zinc-600">
-                <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/5">
-                    <Globe size={14} /> Webhook
-                </div>
-                <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/5">
-                    <Lock size={14} /> AES-256
-                </div>
-            </div>
         </div>
 
-        {/* RIGHT: FORM */}
         <div className="bg-[#0c0c0c] p-12 rounded-[4rem] border border-white/5 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 blur-[80px]"></div>
-          
           <div className="space-y-8 relative z-10">
             <div className="space-y-3">
               <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1 italic">Meta Page ID</label>
               <input 
                 type="text" 
                 placeholder="Enter Page ID" 
-                className="w-full bg-black border border-white/10 rounded-2xl p-6 text-sm outline-none focus:border-blue-600 transition-all font-mono text-blue-400 placeholder:text-zinc-800 shadow-inner" 
+                className="w-full bg-black border border-white/10 rounded-2xl p-6 text-sm outline-none focus:border-blue-600 transition-all font-mono text-blue-400 placeholder:text-zinc-800" 
                 onChange={(e) => setFormData({...formData, pageId: e.target.value})} 
               />
             </div>
@@ -135,7 +115,7 @@ const FacebookSetup = ({ onBack }) => {
               <textarea 
                 rows="4" 
                 placeholder="Paste Access Token..." 
-                className="w-full bg-black border border-white/10 rounded-2xl p-6 text-xs outline-none focus:border-blue-600 transition-all font-mono text-zinc-500 placeholder:text-zinc-800 shadow-inner" 
+                className="w-full bg-black border border-white/10 rounded-2xl p-6 text-xs outline-none focus:border-blue-600 transition-all font-mono text-zinc-500 placeholder:text-zinc-800" 
                 onChange={(e) => setFormData({...formData, pageAccessToken: e.target.value})} 
               />
             </div>
@@ -152,11 +132,10 @@ const FacebookSetup = ({ onBack }) => {
         </div>
       </div>
 
-      {/* --- REAL-TIME MODAL --- */}
       {showModal && (
         <div className="fixed inset-0 bg-black/98 backdrop-blur-3xl flex items-center justify-center z-[999] p-6 animate-in fade-in duration-500">
           <div className="bg-[#0c0c0c] w-full max-w-xl rounded-[4rem] border border-white/10 p-14 relative text-center shadow-2xl">
-            <button onClick={() => setShowModal(false)} className="absolute top-10 right-10 text-zinc-700 hover:text-white transition-all hover:rotate-90"><X /></button>
+            <button onClick={() => setShowModal(false)} className="absolute top-10 right-10 text-zinc-700 hover:text-white transition-all"><X /></button>
             
             <div className="mb-10">
                 <div className={`w-28 h-28 rounded-[3rem] flex items-center justify-center mx-auto mb-8 border transition-all duration-1000 ${isLiveVerified ? 'bg-green-600/20 text-green-500 border-green-500/30 shadow-[0_0_60px_rgba(34,197,94,0.3)]' : 'bg-blue-600/10 text-blue-500 border-blue-600/20'}`}>
@@ -165,9 +144,6 @@ const FacebookSetup = ({ onBack }) => {
                 <h3 className={`text-3xl font-black italic uppercase tracking-tighter ${isLiveVerified ? 'text-green-500' : 'text-white'}`}>
                     {isLiveVerified ? 'Link Established' : 'Awaiting Meta'}
                 </h3>
-                <p className="text-zinc-600 text-xs mt-3 font-medium">
-                    {isLiveVerified ? 'Your neural node is now live and receiving' : 'Sync your Callback URL in Meta Dashboard'}
-                </p>
             </div>
             
             <div className="space-y-4 text-left">
@@ -199,7 +175,8 @@ const FacebookSetup = ({ onBack }) => {
                 ) : (
                     <div className="flex items-center justify-center gap-3 p-5 bg-zinc-900/50 rounded-2xl border border-white/5">
                         <Info size={16} className="text-blue-500 animate-pulse" />
-                        <p className="text-[10px] text-zinc-500 font-bold italic">Meta App Dashboard > Webhook > Verify and Save.</p>
+                        {/* 🔥 FIXED LINE BELOW (&gt; instead of >) */}
+                        <p className="text-[10px] text-zinc-500 font-bold italic">Meta App Dashboard &gt; Webhook &gt; Verify and Save.</p>
                     </div>
                 )}
             </div>
@@ -211,4 +188,4 @@ const FacebookSetup = ({ onBack }) => {
 };
 
 export default FacebookSetup;
-                  
+        
