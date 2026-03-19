@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Facebook, Copy, Loader2, Zap, X, ShieldCheck, ArrowLeft, RefreshCw, Info } from 'lucide-react';
+import { Facebook, Copy, Loader2, Zap, X, ShieldCheck, ArrowLeft, RefreshCw, Info, Globe, Lock } from 'lucide-react';
 import { db, auth } from '../../firebase'; 
 import { doc, setDoc, onSnapshot } from 'firebase/firestore'; 
 import { toast } from 'sonner';
@@ -9,34 +9,38 @@ const FacebookSetup = ({ onBack }) => {
   const [showModal, setShowModal] = useState(false);
   const [verifyToken, setVerifyToken] = useState('');
   const [isLiveVerified, setIsLiveVerified] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null); // Auth state handle karne ke liye
+  const [currentUser, setCurrentUser] = useState(null);
   
-  // 1. Check Auth State Real-time
+  // 1. MONITOR AUTH STATE
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         setCurrentUser(user);
       } else {
-        toast.error("Bhai, session expire ho gaya. Re-login karo.");
+        toast.error("Session Expired. Please Login.");
       }
     });
     return () => unsubscribe();
   }, []);
 
   const uid = currentUser?.uid;
+  // 🔥 WEBHOOK URL: Strictly using UID for the final handshake
   const webhookUrl = `https://intrective-message.vercel.app/api/messenger-webhook/${uid}`;
 
   const [formData, setFormData] = useState({ pageId: '', pageAccessToken: '' });
 
-  // 2. REAL-TIME HANDSHAKE LISTENER
+  // 2. REAL-TIME HANDSHAKE LISTENER (Firestore Listener)
   useEffect(() => {
     let unsubscribe = () => {};
     if (showModal && uid) {
       const docRef = doc(db, "configs", uid);
       unsubscribe = onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists() && docSnap.data().isFbVerified === true) {
-          setIsLiveVerified(true);
-          toast.success("Meta Link Synchronized! 🚀");
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.isFbVerified === true) {
+                setIsLiveVerified(true);
+                toast.success("Meta Connection Established! 🚀");
+            }
         }
       });
     }
@@ -44,96 +48,158 @@ const FacebookSetup = ({ onBack }) => {
   }, [showModal, uid]);
 
   const handleConnect = async () => {
-    if (!uid) return toast.error("Waiting for Secure Connection... Thoda ruko!");
-    if (!formData.pageId || !formData.pageAccessToken) return toast.error("Bhai, details toh bharo!");
+    if (!uid) return toast.error("Bhai, UID load hone do... thoda ruko!");
+    if (!formData.pageId || !formData.pageAccessToken) return toast.error("Details fill kijiye!");
 
     setLoading(true);
     try {
+      // Unique Token for Meta Verification
       const newToken = `bk_fb_${Math.random().toString(36).substring(2, 12)}`;
       setVerifyToken(newToken);
 
-      // 🔥 STRICTLY UID BASED SAVE
+      // 🔥 SAVE TO FIRESTORE: configs/{uid}
       await setDoc(doc(db, "configs", uid), {
         pageId: formData.pageId,
         pageAccessToken: formData.pageAccessToken,
         fbVerifyToken: newToken,
         isFbVerified: false, 
         platform: 'facebook',
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        userId: currentUser.email // Backup info
       }, { merge: true });
 
       setShowModal(true);
+      toast.success("Configuration Uploaded");
     } catch (err) { 
-        console.error("Firebase Error:", err);
-        toast.error("Database Save Failed. Rules check karo!"); 
+        console.error("Firebase Write Error:", err);
+        toast.error("Database Save Failed. Check Firestore Rules!"); 
     }
     setLoading(false);
   };
 
-  return (
-    <div className="p-8 bg-[#050505] min-h-screen text-white font-sans selection:bg-blue-600/30">
-      <button onClick={onBack} className="mb-10 flex items-center gap-2 text-zinc-500 hover:text-white transition-all text-[10px] font-black uppercase tracking-[0.4em]">
-        <ArrowLeft size={14} /> Back to Dashboard
-      </button>
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied to Clipboard");
+  };
 
-      <div className="max-w-2xl mx-auto bg-[#0c0c0c] p-12 rounded-[3.5rem] border border-white/5 shadow-2xl relative overflow-hidden">
-        <h2 className="text-3xl font-black mb-10 italic uppercase tracking-tighter text-blue-500">Facebook <span className="text-white">Node</span></h2>
-        
-        <div className="space-y-8">
-          <input type="text" placeholder="Page ID" className="w-full bg-black border border-white/5 rounded-2xl p-6 outline-none focus:border-blue-500 transition-all font-mono text-blue-400 placeholder:text-zinc-800 shadow-inner" onChange={(e) => setFormData({...formData, pageId: e.target.value})} />
-          <textarea rows="3" placeholder="Access Token" className="w-full bg-black border border-white/5 rounded-2xl p-6 outline-none focus:border-blue-500 transition-all font-mono text-xs text-zinc-400 placeholder:text-zinc-800 shadow-inner" onChange={(e) => setFormData({...formData, pageAccessToken: e.target.value})} />
-          
-          <button onClick={handleConnect} disabled={loading || !uid} className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase flex items-center justify-center gap-4 hover:bg-blue-500 active:scale-95 transition-all shadow-xl shadow-blue-600/20 text-[10px] tracking-widest">
-            {!uid ? <Loader2 className="animate-spin" /> : loading ? <Loader2 className="animate-spin" /> : <Zap size={18} fill="currentColor" />} 
-            { !uid ? 'Securing Link...' : 'Initialize Connection' }
-          </button>
+  return (
+    <div className="p-10 bg-[#050505] min-h-screen text-white font-sans selection:bg-blue-600/30">
+      {/* HEADER */}
+      <div className="max-w-5xl mx-auto flex items-center justify-between mb-16">
+        <button onClick={onBack} className="flex items-center gap-2 text-zinc-600 hover:text-white transition-all text-[10px] font-black uppercase tracking-[0.4em] group">
+          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back to Base
+        </button>
+        <div className="flex items-center gap-3 px-5 py-2 bg-zinc-900/50 rounded-full border border-white/5">
+            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.6)]"></div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Node Sync Online</span>
         </div>
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 bg-black/98 backdrop-blur-2xl flex items-center justify-center z-[999] p-6 animate-in fade-in duration-300">
-          <div className="bg-[#0c0c0c] w-full max-w-lg rounded-[4rem] border border-white/10 p-12 relative text-center">
-            <button onClick={() => setShowModal(false)} className="absolute top-10 right-10 text-zinc-600 hover:text-white transition-transform hover:rotate-90"><X /></button>
-            
-            <div className="mb-10 flex flex-col items-center">
-                <div className={`w-24 h-24 rounded-[3rem] flex items-center justify-center mx-auto mb-6 border transition-all duration-700 ${isLiveVerified ? 'bg-green-600/20 text-green-500 border-green-500/30' : 'bg-blue-600/10 text-blue-500 border-blue-600/20'}`}>
-                    {isLiveVerified ? <ShieldCheck size={48} className="animate-in zoom-in" /> : <RefreshCw size={48} className="animate-spin" />}
+      <div className="max-w-4xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+        {/* LEFT: INFO */}
+        <div className="space-y-6">
+            <div className="w-16 h-16 bg-blue-600/10 rounded-3xl flex items-center justify-center text-blue-500 border border-blue-500/20 shadow-2xl">
+                <Facebook size={32} fill="currentColor" />
+            </div>
+            <h1 className="text-6xl font-black italic uppercase tracking-tighter italic">Messenger <span className="text-blue-600">Flow</span></h1>
+            <p className="text-zinc-500 text-sm leading-relaxed max-w-sm">
+                Connect your Facebook Meta Node to enable AI automated responses and multimedia message handling.
+            </p>
+            <div className="flex items-center gap-4 text-xs font-bold text-zinc-600">
+                <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/5">
+                    <Globe size={14} /> Webhook
                 </div>
-                <h3 className={`text-2xl font-black italic uppercase tracking-tighter ${isLiveVerified ? 'text-green-500' : 'text-white'}`}>
-                    {isLiveVerified ? 'Handshake Success' : 'Waiting for Handshake'}
+                <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/5">
+                    <Lock size={14} /> AES-256
+                </div>
+            </div>
+        </div>
+
+        {/* RIGHT: FORM */}
+        <div className="bg-[#0c0c0c] p-12 rounded-[4rem] border border-white/5 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 blur-[80px]"></div>
+          
+          <div className="space-y-8 relative z-10">
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1 italic">Meta Page ID</label>
+              <input 
+                type="text" 
+                placeholder="Enter Page ID" 
+                className="w-full bg-black border border-white/10 rounded-2xl p-6 text-sm outline-none focus:border-blue-600 transition-all font-mono text-blue-400 placeholder:text-zinc-800 shadow-inner" 
+                onChange={(e) => setFormData({...formData, pageId: e.target.value})} 
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1 italic">Permanent Token</label>
+              <textarea 
+                rows="4" 
+                placeholder="Paste Access Token..." 
+                className="w-full bg-black border border-white/10 rounded-2xl p-6 text-xs outline-none focus:border-blue-600 transition-all font-mono text-zinc-500 placeholder:text-zinc-800 shadow-inner" 
+                onChange={(e) => setFormData({...formData, pageAccessToken: e.target.value})} 
+              />
+            </div>
+            
+            <button 
+                onClick={handleConnect} 
+                disabled={loading || !uid} 
+                className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase text-[11px] tracking-[0.3em] flex items-center justify-center gap-4 hover:bg-blue-500 active:scale-95 transition-all shadow-xl shadow-blue-600/20"
+            >
+              {!uid ? <Loader2 className="animate-spin" /> : loading ? <Loader2 className="animate-spin" /> : <Zap size={20} fill="currentColor" />} 
+              {!uid ? 'Connecting Securely...' : 'Initialize Neural Link'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* --- REAL-TIME MODAL --- */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/98 backdrop-blur-3xl flex items-center justify-center z-[999] p-6 animate-in fade-in duration-500">
+          <div className="bg-[#0c0c0c] w-full max-w-xl rounded-[4rem] border border-white/10 p-14 relative text-center shadow-2xl">
+            <button onClick={() => setShowModal(false)} className="absolute top-10 right-10 text-zinc-700 hover:text-white transition-all hover:rotate-90"><X /></button>
+            
+            <div className="mb-10">
+                <div className={`w-28 h-28 rounded-[3rem] flex items-center justify-center mx-auto mb-8 border transition-all duration-1000 ${isLiveVerified ? 'bg-green-600/20 text-green-500 border-green-500/30 shadow-[0_0_60px_rgba(34,197,94,0.3)]' : 'bg-blue-600/10 text-blue-500 border-blue-600/20'}`}>
+                    {isLiveVerified ? <ShieldCheck size={56} className="animate-in zoom-in" /> : <RefreshCw size={56} className="animate-spin text-blue-400" />}
+                </div>
+                <h3 className={`text-3xl font-black italic uppercase tracking-tighter ${isLiveVerified ? 'text-green-500' : 'text-white'}`}>
+                    {isLiveVerified ? 'Link Established' : 'Awaiting Meta'}
                 </h3>
+                <p className="text-zinc-600 text-xs mt-3 font-medium">
+                    {isLiveVerified ? 'Your neural node is now live and receiving' : 'Sync your Callback URL in Meta Dashboard'}
+                </p>
             </div>
             
             <div className="space-y-4 text-left">
-              <div className="p-6 bg-black rounded-3xl border border-white/5 relative group hover:border-blue-500/30 transition-all">
-                <p className="text-[9px] text-zinc-600 font-bold mb-2 uppercase tracking-widest italic font-black">Callback URL</p>
-                <div className="flex items-center justify-between">
-                    <code className="text-[10px] text-blue-400 break-all font-mono">{webhookUrl}</code>
-                    <Copy size={16} className="text-zinc-700 cursor-pointer hover:text-white transition-all shrink-0" onClick={() => {navigator.clipboard.writeText(webhookUrl); toast.success("Copied");}} />
+              <div className="p-6 bg-black rounded-3xl border border-white/5 group hover:border-blue-500/30 transition-all">
+                <p className="text-[9px] text-zinc-600 font-bold mb-2 uppercase tracking-widest italic">Callback URL</p>
+                <div className="flex items-center justify-between gap-6">
+                    <code className="text-[10px] text-blue-400 break-all font-mono leading-relaxed">{webhookUrl}</code>
+                    <Copy size={20} className="text-zinc-700 cursor-pointer hover:text-white transition-all shrink-0" onClick={() => copyToClipboard(webhookUrl)} />
                 </div>
               </div>
 
-              <div className="p-6 bg-black rounded-3xl border border-white/5 relative group hover:border-green-500/30 transition-all">
-                <p className="text-[9px] text-zinc-600 font-bold mb-2 uppercase tracking-widest italic font-black">Verify Token</p>
+              <div className="p-6 bg-black rounded-3xl border border-white/5 group hover:border-green-500/30 transition-all">
+                <p className="text-[9px] text-zinc-600 font-bold mb-2 uppercase tracking-widest italic">Verify Token</p>
                 <div className="flex items-center justify-between">
-                    <code className="text-3xl text-green-500 font-black tracking-tighter font-mono">{verifyToken}</code>
-                    <Copy size={20} className="text-zinc-700 cursor-pointer hover:text-white transition-all shrink-0" onClick={() => {navigator.clipboard.writeText(verifyToken); toast.success("Copied");}} />
+                    <code className="text-4xl text-green-500 font-black tracking-tighter font-mono">{verifyToken}</code>
+                    <Copy size={24} className="text-zinc-700 cursor-pointer hover:text-white transition-all shrink-0" onClick={() => copyToClipboard(verifyToken)} />
                 </div>
               </div>
             </div>
 
-            <div className="mt-10">
+            <div className="mt-12">
                 {isLiveVerified ? (
                     <button 
                         onClick={() => window.location.reload()} 
-                        className="w-full bg-green-600 py-6 rounded-3xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-green-600/20 hover:bg-green-500 active:scale-95 transition-all"
+                        className="w-full bg-green-600 py-6 rounded-[2.5rem] font-black uppercase text-xs tracking-widest shadow-lg shadow-green-600/20 hover:bg-green-500 active:scale-95 transition-all"
                     >
-                        Activate Neural Inbox
+                        Activate Inbox
                     </button>
                 ) : (
-                    <div className="flex items-center justify-center gap-3 p-4 bg-white/5 rounded-2xl border border-white/5">
-                        <Info size={14} className="text-blue-500" />
-                        <p className="text-[10px] text-zinc-500 font-medium italic">Meta dashboard mein "Verify and Save" karein.</p>
+                    <div className="flex items-center justify-center gap-3 p-5 bg-zinc-900/50 rounded-2xl border border-white/5">
+                        <Info size={16} className="text-blue-500 animate-pulse" />
+                        <p className="text-[10px] text-zinc-500 font-bold italic">Meta App Dashboard > Webhook > Verify and Save.</p>
                     </div>
                 )}
             </div>
