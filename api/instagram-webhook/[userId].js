@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
 
 const firebaseConfig = { 
+  // Aapka original config...
   apiKey: "AIzaSyCDmDsi_JMQgx_QO4p8bnvfh-vKdN4Bmk8",
   authDomain: "success-points.firebaseapp.com",
   projectId: "success-points",
@@ -17,37 +18,51 @@ export default async function handler(req, res) {
   const { userId } = req.query; 
   const cleanId = decodeURIComponent(userId || '');
 
+  // Meta verification (GET)
   if (req.method === 'GET') {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
-    try {
-      // UID se document dhoond rahe hain
-      const userRef = doc(db, "configs", cleanId);
-      const userSnap = await getDoc(userRef);
+    if (mode && token) {
+      try {
+        const userRef = doc(db, "configs", cleanId);
+        const userSnap = await getDoc(userRef);
 
-      if (userSnap.exists()) {
-        const storedToken = userSnap.data().fbVerifyToken;
-        
-        if (mode === 'subscribe' && token === storedToken) {
-          // 🔥 SYNC FIX: Dashboard ko batane ke liye database update
-          await updateDoc(userRef, { 
-            isFbVerified: true, 
-            isVerified: true, // Common verification flag
-            verifiedAt: new Date() 
-          });
+        if (userSnap.exists()) {
+          // 🔥 FIXED: Wahi naam jo React code save kar raha hai
+          const storedToken = userSnap.data().insta_verify_token;
           
-          return res.status(200).send(challenge); 
+          if (mode === 'subscribe' && token === storedToken) {
+            console.log("WEBHOOK_VERIFIED");
+            
+            // Background mein update karein (Meta ko wait mat karwayein)
+            updateDoc(userRef, { 
+              isInstaVerified: true, 
+              verifiedAt: new Date() 
+            }).catch(e => console.error("Update error:", e));
+            
+            return res.status(200).send(challenge); 
+          }
         }
+        return res.status(403).send('Forbidden: Token Mismatch');
+      } catch (e) { 
+        return res.status(500).send('Internal Server Error'); 
       }
-      return res.status(403).send('Auth Failed');
-    } catch (e) { return res.status(500).send('Error'); }
+    }
   }
 
+  // Real-time Messages (POST)
   if (req.method === 'POST') {
-    return res.status(200).send('EVENT_RECEIVED');
+    const body = req.body;
+    console.log("Message Received:", JSON.stringify(body));
+
+    if (body.object === 'instagram' || body.object === 'page') {
+      // Yahan aap apna bot logic likhenge jo message ka reply karega
+      return res.status(200).send('EVENT_RECEIVED');
+    }
+    return res.status(404).send('Not an Instagram event');
   }
 
-  res.status(405).end();
+  res.status(405).end(); // Method Not Allowed
 }
