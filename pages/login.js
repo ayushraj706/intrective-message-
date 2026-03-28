@@ -13,6 +13,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const inputRefs = useRef([]);
 
+  // --- TIMER LOGIC ---
   const [timer, setTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
 
@@ -29,13 +30,14 @@ export default function Login() {
   }, [step, timer]);
 
   // --- NEURAL SMART PASTE ---
+  // Telegram se code copy karke yahan paste karne par saare boxes khud bhar jayenge
   const handlePaste = (e) => {
     const data = e.clipboardData.getData('text').trim();
     if (data.length === 6 && /^\d+$/.test(data)) {
       const pasteOtp = data.split('');
       setOtp(pasteOtp);
-      inputRefs.current[5].focus();
-      toast.success("Code Automatically Pasted!");
+      inputRefs.current[5].focus(); // Last box pe focus le jao
+      toast.success("Neural Code Automatically Applied!");
     }
   };
 
@@ -55,35 +57,37 @@ export default function Login() {
     }
   };
 
+  // --- STEP 1: SEND OTP ---
   const handleSendOtp = async (e) => {
     if (e) e.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail) return toast.warning("Email dalna zaroori hai!");
+    if (!cleanEmail) return toast.warning("Admin Email dalna zaroori hai!");
 
     setLoading(true);
     try {
-      // Ab hum 'send-master-otp' use karenge jo Telegram + Email handle karta hai
+      // Hum naye Master Node API ko call kar rahe hain
       const res = await fetch('/api/send-master-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           email: cleanEmail,
-          targetPhone: "919229966001", // Aapka primary number
-          type: 'login' // Signal for backend separation
+          targetPhone: "919229966001", // Aapka master number
+          type: 'login' // Conflict fix: 'login_' prefix use hoga
         }),
       });
+      
       const data = await res.json();
       
       if (data.success) {
-        toast.success("Neural Code Dispatched!", { description: "Check Telegram or Email." });
+        toast.success("Security Code Dispatched!", { description: "Check your Telegram/Email." });
         setStep(2);
         setTimer(30);
         setCanResend(false);
       } else {
-        toast.error(data.error || "Master Node is busy.");
+        toast.error(data.error || "Master Node connection failed.");
       }
     } catch (err) { 
-      toast.error("Connection Failed", { description: "Check your internet." }); 
+      toast.error("Connection Failed", { description: "Server is unreachable. Check Vercel logs." }); 
     }
     setLoading(false);
   };
@@ -95,6 +99,7 @@ export default function Login() {
     await handleSendOtp();
   };
 
+  // --- STEP 2: VERIFY OTP ---
   const handleVerifyOtp = async (e) => {
     if (e) e.preventDefault();
     const finalOtp = otp.join('');
@@ -110,19 +115,23 @@ export default function Login() {
         body: JSON.stringify({ 
           email: cleanEmail, 
           otp: finalOtp,
-          type: 'login' // Ensure we match the login prefix
+          type: 'login' // Path matching logic
         }),
       });
+      
       const data = await res.json();
       
       if (data.success && data.token) {
-        toast.success("Identity Verified!");
+        toast.success("Identity Verified!", { description: "Redirecting to Dashboard..." });
         await signInWithCustomToken(auth, data.token);
+        
+        // Session storage for security
         localStorage.setItem('admin_email', cleanEmail); 
         localStorage.setItem('basekey_session', 'authenticated');
+        
         router.push('/dashboard');
       } else {
-        toast.error(data.error || "Invalid or Expired Code.");
+        toast.error(data.error || "Invalid or Expired Security Code.");
       }
     } catch (err) { 
         toast.error("Verification Error", { description: err.message }); 
@@ -133,7 +142,7 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[#020202] flex items-center justify-center p-6 text-zinc-900 dark:text-white font-sans overflow-hidden transition-colors duration-500">
       
-      {/* Background Glow */}
+      {/* Background Neural Glow */}
       <div className="fixed inset-0 pointer-events-none flex items-center justify-center">
         <div className="w-[80vw] h-[80vw] md:w-[40vw] md:h-[40vw] bg-blue-600/10 blur-[120px] rounded-full"></div>
       </div>
@@ -141,26 +150,26 @@ export default function Login() {
       <div className="w-full max-w-[450px] bg-white dark:bg-[#0A0A0A] border border-zinc-200 dark:border-white/10 rounded-[3rem] p-10 md:p-12 text-center shadow-2xl relative z-10 transition-all duration-300">
         
         {step === 2 && (
-          <button onClick={() => setStep(1)} className="absolute top-8 left-8 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-all bg-zinc-100 dark:bg-white/5 p-2 rounded-full">
+          <button onClick={() => setStep(1)} className="absolute top-8 left-8 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-all bg-zinc-100 dark:bg-white/5 p-2 rounded-full active:scale-90">
             <ArrowLeft size={18} />
           </button>
         )}
         
         <div className="mb-8 inline-flex p-5 bg-blue-500/10 rounded-[1.5rem] border border-blue-500/20 text-blue-600 dark:text-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.15)]">
-          {step === 1 ? <ShieldCheck size={40} /> : <Fingerprint size={40} className="animate-pulse" />}
+          {step === 1 ? <ShieldCheck size={40} /> : <Fingerprint size={40} className="animate-pulse text-blue-400" />}
         </div>
         
-        <h1 className="text-4xl font-black mb-2 tracking-tighter italic uppercase underline-offset-8">Base<span className="text-blue-600">Key</span></h1>
+        <h1 className="text-4xl font-black mb-2 tracking-tighter italic uppercase">Base<span className="text-blue-600">Key</span></h1>
         
         {step === 1 ? (
            <p className="text-zinc-500 dark:text-zinc-400 mb-10 text-[10px] uppercase tracking-[0.3em] font-bold">Secure Admin Neural Link</p>
         ) : (
-           <p className="text-zinc-500 dark:text-zinc-400 mb-10 text-xs font-medium italic opacity-80 underline underline-offset-4 decoration-blue-500/30">{email}</p>
+           <p className="text-zinc-500 dark:text-zinc-400 mb-10 text-xs font-medium italic opacity-80 underline underline-offset-4 decoration-blue-500/30 break-all">{email}</p>
         )}
 
         {/* STEP 1: EMAIL INPUT */}
         {step === 1 ? (
-          <form onSubmit={handleSendOtp} className="space-y-6 text-left">
+          <form onSubmit={handleSendOtp} className="space-y-6 text-left animate-in slide-in-from-bottom duration-500">
             <div className="relative">
               <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-400" size={20} />
               <input 
@@ -179,7 +188,7 @@ export default function Login() {
         ) : (
           
         /* STEP 2: OTP VERIFICATION */
-          <form onSubmit={handleVerifyOtp} className="space-y-8">
+          <form onSubmit={handleVerifyOtp} className="space-y-8 animate-in zoom-in duration-300">
             <div className="flex justify-between gap-2 md:gap-3">
               {otp.map((digit, idx) => (
                 <input
@@ -188,7 +197,7 @@ export default function Login() {
                   type="text"
                   inputMode="numeric"
                   value={digit}
-                  onPaste={idx === 0 ? handlePaste : undefined}
+                  onPaste={idx === 0 ? handlePaste : undefined} // Only first box handles paste
                   onChange={(e) => handleChange(idx, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(idx, e)}
                   className="w-full h-14 md:h-16 bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-white/10 rounded-2xl text-center text-2xl font-black focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all caret-blue-500 shadow-inner"
@@ -196,20 +205,20 @@ export default function Login() {
               ))}
             </div>
 
-            <div className="flex items-center justify-center text-xs font-bold">
+            <div className="flex items-center justify-center text-[10px] uppercase tracking-widest font-bold">
                {canResend ? (
                  <button type="button" onClick={handleResendOtp} className="text-blue-600 hover:text-blue-500 flex items-center gap-2 transition-colors">
-                   <RefreshCw size={14} /> Resend Neural Code
+                   <RefreshCw size={12} /> Resend Neural Code
                  </button>
                ) : (
-                 <span className="text-zinc-400 flex items-center gap-2">
-                   <Loader2 size={12} className="animate-spin" /> Resend in 00:{timer < 10 ? `0${timer}` : timer}
+                 <span className="text-zinc-500 flex items-center gap-2">
+                   <Loader2 size={10} className="animate-spin" /> Resend in 00:{timer < 10 ? `0${timer}` : timer}
                  </span>
                )}
             </div>
 
-            <button type="submit" disabled={loading || otp.join('').length < 6} className="w-full bg-zinc-900 hover:bg-black dark:bg-white dark:hover:bg-zinc-200 dark:text-black text-white font-black py-4.5 rounded-3xl transition-all shadow-xl active:scale-95 h-14 flex items-center justify-center">
-              {loading ? <Loader2 className="animate-spin text-zinc-500" size={20} /> : 'Verify Identity'}
+            <button type="submit" disabled={loading || otp.join('').length < 6} className="w-full bg-zinc-900 hover:bg-black dark:bg-white dark:hover:bg-zinc-200 dark:text-black text-white font-black py-4.5 rounded-3xl transition-all shadow-xl active:scale-95 h-14 flex items-center justify-center uppercase tracking-widest text-xs">
+              {loading ? <Loader2 className="animate-spin text-zinc-500" size={20} /> : 'Confirm Identity'}
             </button>
           </form>
         )}
@@ -220,4 +229,5 @@ export default function Login() {
       </div>
     </div>
   );
-}
+          }
+                    
