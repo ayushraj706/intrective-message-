@@ -5,38 +5,45 @@ if (!admin.apps.length) {
     credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT))
   });
 }
-
 const db = admin.firestore();
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST allowed' });
 
-  const { email, otp } = req.body;
+  const { email, otp, type } = req.body;
+  const cleanEmail = email.trim().toLowerCase();
+  const docId = `${type || 'login'}_${cleanEmail}`; // Match prefix
 
   try {
-    const doc = await db.collection('otps').doc(email).get();
+    const otpDoc = await db.collection('otps').doc(docId).get();
     
-    if (!doc.exists) return res.status(400).json({ success: false, error: 'OTP expired or not sent!' });
+    if (!otpDoc.exists) return res.status(400).json({ error: 'OTP expired ya generate nahi hua!' });
 
-    const data = doc.data();
+    const data = otpDoc.data();
 
-    if (data.otp === otp) {
-      // --- LOGIC: Firebase Custom Token Generate Karo ---
-      const customToken = await admin.auth().createCustomToken(email);
+    // 1. Basic Validation
+    if (data.otp !== otp) return res.status(400).json({ error: 'Galat OTP!' });
+    if (Date.now() > data.expiresAt) return res.status(400).json({ error: 'OTP Expire ho gaya hai.' });
 
-      await db.collection('users').doc(email).set({
-        email,
+    // 2. SUCCESS LOGIC
+    let responseData = { success: true };
+
+    if (type === 'login') {
+      // Login ke liye Custom Token banayein
+      const customToken = await admin.auth().createCustomToken(cleanEmail);
+      responseData.token = customToken;
+
+      await db.collection('users').doc(cleanEmail).set({
+        email: cleanEmail,
         lastLogin: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
-
-      await db.collection('otps').doc(email).delete();
-
-      // Token frontend ko bhejo
-      res.status(200).json({ success: true, token: customToken });
-    } else {
-      res.status(400).json({ success: false, error: 'Galat OTP!' });
     }
+
+    // Clear OTP after success
+    await db.collection('otps').doc(docId).delete();
+
+    res.status(200).json(responseData);
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ error: error.message });
   }
 }
