@@ -6,19 +6,19 @@ export default function TwoFactorSettings({ onBack, userEmail = "" }) {
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [step, setStep] = useState(1); // 1: Number, 2: OTP
+  const [step, setStep] = useState(1); 
   const [loading, setLoading] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const otpRefs = useRef([]);
 
-  // --- SMART PASTE LOGIC (Automatic OTP Fill) ---
+  // --- SMART PASTE LOGIC ---
   const handlePaste = (e) => {
     const pastedData = e.clipboardData.getData('text').trim();
     if (pastedData.length === 6 && /^\d+$/.test(pastedData)) {
       const newOtp = pastedData.split('');
       setOtp(newOtp);
-      otpRefs.current[5].focus(); // Focus last box
-      toast.success("OTP Automatically Filled!");
+      otpRefs.current[5].focus(); 
+      toast.success("Neural Code Applied!");
     }
   };
 
@@ -36,57 +36,65 @@ export default function TwoFactorSettings({ onBack, userEmail = "" }) {
     }
   };
 
-  // Step 1: Request OTP from Master Node
+  // --- STEP 1: REQUEST 2FA OTP ---
   const requestOtp = async () => {
-    if (!phoneNumber || phoneNumber.length < 10) return toast.error("Sahi phone number daalein!");
-    
+    if (!phoneNumber || phoneNumber.length < 10) return toast.error("Valid phone number daalein!");
+    if (!userEmail) return toast.error("Email detection failed. Please refresh.");
+
     setLoading(true);
     try {
-      const res = await fetch('/api/send-master-otp', {
+      // FIX: Calling unified 'send-otp' with '2fa' type
+      const res = await fetch('/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          email: userEmail || "admin@basekey", // Safety fallback
+          email: userEmail.trim().toLowerCase(), 
+          type: '2fa', // NEURAL PREFIX SIGNAL
           targetPhone: phoneNumber 
         }),
       });
       const data = await res.json();
       
       if (data.success) {
-        toast.success("OTP Sent!", { description: "Telegram check karein." });
+        toast.success("Security Code Sent!", { description: "Check Telegram & Email." });
         setStep(2);
       } else {
-        toast.error(data.error || "Sending failed");
+        toast.error(data.error || "Neural Link Busy");
       }
     } catch (err) {
-      toast.error("Master Node Link Error");
+      toast.error("Connection Failed", { description: "API not reachable." });
     }
     setLoading(false);
   };
 
-  // Step 2: Verify OTP
+  // --- STEP 2: VERIFY 2FA OTP ---
   const verifyOtp = async () => {
     const finalOtp = otp.join('');
-    if (finalOtp.length < 6) return toast.warning("Poora OTP daalein!");
+    if (finalOtp.length < 6) return toast.warning("Poora code daalein!");
 
     setLoading(true);
     try {
+      // FIX: Matching '2fa' type for prefix verification
       const res = await fetch('/api/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: userEmail, otp: finalOtp }),
+        body: JSON.stringify({ 
+          email: userEmail.trim().toLowerCase(), 
+          otp: finalOtp,
+          type: '2fa' // MATCHING PREFIX
+        }),
       });
       const data = await res.json();
 
       if (data.success) {
         setIsVerified(true);
-        toast.success("Identity Verified!", { description: "Neural 2FA is now active." });
-        setStep(1); 
+        toast.success("Neural 2FA Activated!", { description: "Identity verified successfully." });
+        // Optional: Save to user profile here
       } else {
-        toast.error(data.error || "Invalid OTP!");
+        toast.error(data.error || "Invalid Security Code!");
       }
     } catch (err) {
-      toast.error("Verification failed");
+      toast.error("Verification failed", { description: err.message });
     }
     setLoading(false);
   };
@@ -95,7 +103,7 @@ export default function TwoFactorSettings({ onBack, userEmail = "" }) {
     <div className="p-8 md:p-16 bg-[#080808] min-h-screen text-white font-sans animate-in slide-in-from-right duration-500">
       <button onClick={onBack} className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors mb-8 group">
         <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-        <span className="text-xs font-bold uppercase tracking-widest text-[10px]">Back to Dashboard</span>
+        <span className="text-xs font-black uppercase tracking-widest text-[10px]">Back to Dashboard</span>
       </button>
 
       <div className="max-w-4xl mx-auto">
@@ -106,28 +114,30 @@ export default function TwoFactorSettings({ onBack, userEmail = "" }) {
           </h2>
         </div>
         <p className="text-zinc-500 mb-12 text-[10px] font-bold font-mono tracking-[0.3em] uppercase opacity-70">
-          Admin Email: {userEmail || "Detecting..."}
+          Identity: {userEmail || "Detecting Node..."}
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            <div className={`p-8 rounded-[2.5rem] border transition-all duration-500 ${is2FAEnabled ? 'bg-blue-500/5 border-blue-500/20' : 'bg-[#111] border-white/5'}`}>
+            <div className={`p-8 rounded-[2.5rem] border transition-all duration-500 ${isVerified ? 'bg-blue-600/5 border-blue-500/20 shadow-[0_0_50px_rgba(37,99,235,0.05)]' : 'bg-[#111] border-white/5'}`}>
               <div className="flex items-center justify-between mb-8">
                 <div>
                   <h3 className="text-xl font-bold">Two-Factor Authentication</h3>
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">
+                  <p className={`text-[10px] uppercase tracking-widest mt-1 font-black ${isVerified ? 'text-blue-400' : 'text-zinc-500'}`}>
                     {isVerified ? 'Secure link active' : 'Account status: Vulnerable'}
                   </p>
                 </div>
-                <button 
-                  onClick={() => setIs2FAEnabled(!is2FAEnabled)}
-                  className={`w-14 h-8 rounded-full transition-all relative ${is2FAEnabled ? 'bg-blue-600' : 'bg-zinc-800'}`}
-                >
-                  <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all ${is2FAEnabled ? 'left-7' : 'left-1'}`} />
-                </button>
+                {!isVerified && (
+                   <button 
+                    onClick={() => setIs2FAEnabled(!is2FAEnabled)}
+                    className={`w-14 h-8 rounded-full transition-all relative ${is2FAEnabled ? 'bg-blue-600' : 'bg-zinc-800'}`}
+                  >
+                    <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all ${is2FAEnabled ? 'left-7' : 'left-1'}`} />
+                  </button>
+                )}
               </div>
 
-              {is2FAEnabled && (
+              {is2FAEnabled && !isVerified && (
                 <div className="space-y-6 animate-in fade-in zoom-in duration-300">
                   {step === 1 ? (
                     <div className="space-y-4">
@@ -135,27 +145,23 @@ export default function TwoFactorSettings({ onBack, userEmail = "" }) {
                         <Smartphone className="absolute left-5 top-5 text-zinc-500" size={20} />
                         <input 
                           type="text" 
-                          placeholder="+91 00000 00000"
+                          placeholder="91 00000 00000 (With Country Code)"
                           value={phoneNumber}
                           onChange={(e) => setPhoneNumber(e.target.value)}
-                          disabled={isVerified}
                           className="w-full h-16 bg-zinc-900 border border-white/5 rounded-2xl pl-14 pr-6 focus:outline-none focus:border-blue-500/50 transition-all font-mono text-lg"
                         />
-                        {isVerified && <CheckCircle2 className="absolute right-5 top-5 text-green-500" size={24} />}
                       </div>
-                      {!isVerified && (
-                        <button 
-                          onClick={requestOtp}
-                          disabled={loading}
-                          className="w-full bg-blue-600 text-white font-black py-5 rounded-2xl uppercase tracking-widest hover:bg-blue-500 transition-all flex items-center justify-center gap-3 shadow-xl shadow-blue-600/10"
-                        >
-                          {loading ? <Loader2 className="animate-spin" size={20} /> : 'Request Neural Code'}
-                        </button>
-                      )}
+                      <button 
+                        onClick={requestOtp}
+                        disabled={loading}
+                        className="w-full bg-blue-600 text-white font-black py-5 rounded-2xl uppercase tracking-widest hover:bg-blue-500 transition-all flex items-center justify-center gap-3 shadow-xl shadow-blue-600/10 active:scale-95"
+                      >
+                        {loading ? <Loader2 className="animate-spin" size={20} /> : 'Request Security Code'}
+                      </button>
                     </div>
                   ) : (
                     <div className="space-y-8 text-center animate-in slide-in-from-bottom duration-300">
-                      <p className="text-zinc-400 text-xs font-bold uppercase tracking-[0.2em]">Enter 6-Digit Code</p>
+                      <p className="text-zinc-400 text-[10px] font-black uppercase tracking-[0.2em]">Enter Verification Code</p>
                       <div className="flex justify-between gap-2 md:gap-3">
                         {otp.map((digit, i) => (
                           <input
@@ -163,12 +169,11 @@ export default function TwoFactorSettings({ onBack, userEmail = "" }) {
                             ref={el => otpRefs.current[i] = el}
                             type="text"
                             inputMode="numeric"
-                            maxLength={1}
                             value={digit}
                             onPaste={i === 0 ? handlePaste : undefined}
                             onChange={e => handleOtpChange(i, e.target.value)}
                             onKeyDown={e => handleKeyDown(i, e)}
-                            className="w-full h-16 bg-zinc-900 border border-white/10 rounded-2xl text-center text-2xl font-black focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-inner"
+                            className="w-full h-16 bg-zinc-900 border border-white/10 rounded-2xl text-center text-2xl font-black focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
                           />
                         ))}
                       </div>
@@ -176,16 +181,26 @@ export default function TwoFactorSettings({ onBack, userEmail = "" }) {
                         <button 
                           onClick={verifyOtp}
                           disabled={loading}
-                          className="w-full bg-white text-black font-black py-5 rounded-2xl uppercase tracking-widest hover:bg-zinc-200 transition-all shadow-xl shadow-white/5 flex items-center justify-center"
+                          className="w-full bg-white text-black font-black py-5 rounded-2xl uppercase tracking-widest hover:bg-zinc-200 transition-all flex items-center justify-center active:scale-95"
                         >
-                          {loading ? <Loader2 className="animate-spin text-zinc-500" size={20} /> : 'Verify Identity'}
+                          {loading ? <Loader2 className="animate-spin text-zinc-500" size={20} /> : 'Establish Secure Link'}
                         </button>
-                        <button onClick={() => setStep(1)} className="text-[10px] text-zinc-500 uppercase font-black tracking-widest hover:text-white transition-colors flex items-center gap-2 mx-auto">
-                          <RefreshCw size={12} /> Wrong Number? Try again
+                        <button onClick={() => setStep(1)} className="text-[10px] text-zinc-600 uppercase font-black tracking-widest hover:text-white transition-colors flex items-center gap-2 mx-auto">
+                          <RefreshCw size={12} /> Retry Identity Check
                         </button>
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {isVerified && (
+                <div className="flex items-center gap-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl animate-in zoom-in">
+                  <CheckCircle2 className="text-blue-500" size={24} />
+                  <div>
+                    <p className="text-sm font-bold">Encrypted Connection Established</p>
+                    <p className="text-[10px] text-blue-400/50 uppercase tracking-widest font-black">Linked to: +{phoneNumber}</p>
+                  </div>
                 </div>
               )}
             </div>
@@ -194,23 +209,16 @@ export default function TwoFactorSettings({ onBack, userEmail = "" }) {
           <div className="space-y-6">
             <div className="bg-zinc-900/50 border border-white/5 p-8 rounded-[2.5rem]">
               <h4 className="font-black mb-4 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-blue-500">
-                <Fingerprint size={16} /> Neural Link Status
+                <Fingerprint size={16} /> Encryption Status
               </h4>
-              <p className="text-[11px] text-zinc-400 leading-relaxed font-medium">
-                OTP will be transmitted via <b className="text-zinc-100">Master Node</b>. Tap the code in your Telegram notification to copy, then paste it in the first box.
+              <p className="text-[11px] text-zinc-400 leading-relaxed font-medium italic">
+                All codes are generated via <b className="text-zinc-100 italic">BaseKey Master Node</b>. If you use Telegram, tap the notification to instantly copy your code.
               </p>
-            </div>
-            
-            <div className="p-8 rounded-[2.5rem] bg-blue-600/5 border border-blue-500/10">
-               <AlertCircle className="text-blue-500 mb-3" size={24} />
-               <p className="text-[9px] text-blue-200/50 uppercase tracking-[0.2em] font-black leading-normal">
-                 System v2.0.4: Master Link established. All signals are encrypted.
-               </p>
             </div>
           </div>
         </div>
       </div>
     </div>
   );
-              }
+                        }
                 
