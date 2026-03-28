@@ -10,14 +10,14 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState(''); 
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [step, setStep] = useState(1); // 1: Email, 2: Email OTP, 3: Telegram 2FA
+  const [step, setStep] = useState(1); // 1: Email, 2: Email OTP, 3: Telegram OTP
   const [loading, setLoading] = useState(false);
-  const [authSuccess, setAuthSuccess] = useState(false); // Redirect safety
   const inputRefs = useRef([]);
+
   const [timer, setTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
 
-  // Timer Logic
+  // OTP Timer Logic
   useEffect(() => {
     let interval;
     if ((step === 2 || step === 3) && timer > 0) {
@@ -42,27 +42,29 @@ export default function Login() {
     }
   };
 
-  // --- STEP 1: REQUEST EMAIL ---
-  const requestEmailOtp = async (e) => {
+  // --- STEP 1: SEND EMAIL OTP ---
+  const handleSendOtp = async (e) => {
     if (e) e.preventDefault();
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) return toast.warning("Admin Email required!");
+
     setLoading(true);
     try {
       const res = await fetch('/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), type: 'login' }),
+        body: JSON.stringify({ email: cleanEmail, type: 'login' }),
       });
       const data = await res.json();
       if (data.success) {
-        toast.success("Verification code sent.");
+        toast.success("Security code sent to email.");
         setStep(2);
         setTimer(30);
         setCanResend(false);
-        setOtp(['', '', '', '', '', '']);
       } else {
         toast.error(data.error || "Failed to send code.");
       }
-    } catch (err) { toast.error("Connection failed."); }
+    } catch (err) { toast.error("System connection failed."); }
     setLoading(false);
   };
 
@@ -70,141 +72,152 @@ export default function Login() {
   const handleVerify = async (e) => {
     if (e) e.preventDefault();
     const finalOtp = otp.join('');
+    const cleanEmail = email.trim().toLowerCase();
+
     setLoading(true);
     try {
       const res = await fetch('/api/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          email: email.trim().toLowerCase(), 
+          email: cleanEmail, 
           otp: finalOtp, 
-          type: step === 2 ? 'login' : '2fa' 
+          type: step === 2 ? 'login' : '2fa' // Backend prefix switcher
         }),
       });
       const data = await res.json();
 
       if (data.success) {
-        // NEURAL 2FA CHECK: Agar backend bole ki 2FA chahiye
+        // NEURAL SWITCH: Agar 2FA on hai toh step 3 par bhej do
         if (data.require2FA && step === 2) {
-          toast.info("Telegram verification required.");
+          toast.info("Secondary Verification Required");
           setPhone(data.phoneNumber);
-          setStep(3); // Moving to Telegram Step
+          setStep(3); // Step 3 trigger
           setOtp(['', '', '', '', '', '']);
-          setTimer(30);
-          // Trigger Telegram OTP
+          // Auto-trigger Telegram OTP from Master Node
           await fetch('/api/send-otp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: email.trim().toLowerCase(), type: '2fa', targetPhone: data.phoneNumber }),
+            body: JSON.stringify({ email: cleanEmail, type: '2fa', targetPhone: data.phoneNumber }),
           });
+          setTimer(30);
         } 
+        // FINAL SUCCESS: Dashboard Redirection
         else if (data.token) {
-          // FINAL LOGIN SUCCESS
-          setAuthSuccess(true);
+          toast.success("Identity Verified!");
           await signInWithCustomToken(auth, data.token);
-          localStorage.setItem('admin_email', email.trim().toLowerCase());
-          localStorage.setItem('is_auth', 'true');
-          toast.success("Authenticated successfully!");
           
-          // Redirecting to Dashboard
-          router.push('/dashboard'); 
+          localStorage.setItem('admin_email', cleanEmail);
+          localStorage.setItem('basekey_session', 'authenticated');
+          
+          router.push('/dashboard'); // <--- YE HAI DASHBOARD ENTER KARNE KA LOGIC
         }
       } else {
-        toast.error(data.error || "Invalid code.");
+        toast.error(data.error || "Invalid Security Code.");
       }
-    } catch (err) { toast.error("Verification error."); }
+    } catch (err) { toast.error("Verification Breach Detected."); }
     setLoading(false);
   };
-
-  if (authSuccess) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="animate-spin text-[#00A884]" size={40} />
-          <p className="text-sm font-bold text-zinc-500 uppercase tracking-widest">Entering Dashboard...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] flex flex-col items-center justify-center p-4 font-sans text-[#1C1E21]">
       
-      {/* Meta Header */}
-      <div className="w-full max-w-[450px] text-center mb-8">
-        <h1 className="text-[28px] font-bold text-[#00A884] mb-2">BaseKey Business</h1>
-        <p className="text-[#606770] text-sm">Verify your administrative account to continue.</p>
+      {/* Meta Style Header */}
+      <div className="w-full max-w-[400px] text-center mb-6">
+        <div className="flex justify-center items-center gap-2 mb-3">
+           <div className="bg-[#00A884] p-2 rounded-lg text-white">
+              <Shield size={24} />
+           </div>
+           <h1 className="text-xl font-bold tracking-tight text-[#1C1E21]">BaseKey <span className="text-[#00A884]">Developers</span></h1>
+        </div>
+        <p className="text-[10px] text-[#606770] font-bold uppercase tracking-widest">Master Node v2.0.4</p>
       </div>
 
-      <div className="w-full max-w-[450px] bg-white rounded-lg shadow-md border border-[#DDD] p-8 md:p-12">
-        <h2 className="text-xl font-bold mb-2">
-          {step === 1 ? 'Log In' : step === 2 ? 'Verify Email' : 'Telegram 2-Step'}
-        </h2>
-        <p className="text-sm text-[#606770] mb-8">
-          {step === 1 ? 'Enter the email address linked to your developer account.' : 
-           step === 2 ? `Enter the 6-digit code we sent to ${email}.` : 
-           `Confirm your identity with the code sent to Telegram (+${phone}).`}
-        </p>
+      <div className="w-full max-w-[400px] bg-white rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.1),0_8px_16px_rgba(0,0,0,0.1)] border border-[#DDD] overflow-hidden">
+        
+        {/* Progress Bar */}
+        <div className="h-1 w-full bg-[#EBEDF0]">
+           <div className={`h-full bg-[#00A884] transition-all duration-700 ${step === 1 ? 'w-1/3' : step === 2 ? 'w-2/3' : 'w-full'}`}></div>
+        </div>
 
-        {step === 1 ? (
-          <form onSubmit={requestEmailOtp} className="space-y-6">
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-[#4B4F56] uppercase ml-1">Email Address</label>
-              <input 
-                type="email" required placeholder="admin@basekey.fun" value={email} onChange={(e) => setEmail(e.target.value)}
-                className="w-full h-12 bg-white border border-[#DDD] rounded-md px-4 outline-none focus:border-[#00A884] focus:ring-1 focus:ring-[#00A884] transition-all text-[15px]"
-              />
-            </div>
-            <button disabled={loading} className="w-full h-11 bg-[#00A884] hover:bg-[#008F70] text-white font-bold rounded-md transition-all flex items-center justify-center shadow-sm">
-              {loading ? <Loader2 className="animate-spin" size={20} /> : 'Continue'}
+        <div className="p-8">
+          {step > 1 && (
+            <button onClick={() => setStep(1)} className="flex items-center gap-1 text-[10px] font-bold text-[#00A884] uppercase mb-4 hover:underline">
+              <ArrowLeft size={12} /> Change Account
             </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerify} className="space-y-8">
-            <div className="flex justify-between gap-2">
-              {otp.map((digit, idx) => (
-                <input
-                  key={idx} ref={(el) => (inputRefs.current[idx] = el)} type="text" inputMode="numeric" value={digit}
-                  onChange={(e) => handleChange(idx, e.target.value)} onKeyDown={(e) => handleKeyDown(idx, e)}
-                  className="w-full h-14 bg-white border-b-2 border-[#DDD] text-center text-2xl font-bold focus:border-[#00A884] outline-none transition-all"
-                />
-              ))}
-            </div>
+          )}
 
-            <div className="space-y-4">
-              <button disabled={loading || otp.join('').length < 6} className="w-full h-11 bg-[#1C1E21] hover:bg-black text-white font-bold rounded-md transition-all flex items-center justify-center">
-                {loading ? <Loader2 className="animate-spin" size={20} /> : 'Verify'}
+          <h2 className="text-xl font-bold mb-2">
+            {step === 1 ? 'Identity' : step === 2 ? 'Verify Email' : 'Telegram 2FA'}
+          </h2>
+          <p className="text-xs text-[#606770] mb-8 leading-relaxed">
+            {step === 1 ? 'Enter your work email to access the administrative portal.' : 
+             step === 2 ? `Enter the 6-digit code sent to ${email}` : 
+             `A security code was sent to your Telegram (+${phone})`}
+          </p>
+
+          {step === 1 ? (
+            <form onSubmit={handleSendOtp} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-[#4B4F56] uppercase tracking-wider ml-1">Work Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8D949E]" size={16} />
+                  <input 
+                    type="email" required placeholder="admin@basekey.fun" value={email} onChange={(e) => setEmail(e.target.value)}
+                    className="w-full h-11 bg-[#F5F6F7] border border-[#DDD] rounded-lg pl-11 pr-4 outline-none focus:border-[#00A884] transition-all text-sm"
+                  />
+                </div>
+              </div>
+              <button disabled={loading} className="w-full h-11 bg-[#00A884] hover:bg-[#008F70] text-white font-bold rounded-lg transition-all flex items-center justify-center shadow-sm">
+                {loading ? <Loader2 className="animate-spin" size={18} /> : 'Continue'}
               </button>
-              
-              <div className="text-center">
-                {canResend ? (
-                  <button type="button" onClick={requestEmailOtp} className="text-xs font-bold text-[#00A884] hover:underline flex items-center justify-center gap-1 mx-auto">
-                    <RefreshCw size={12} /> Resend Code
-                  </button>
-                ) : (
-                  <p className="text-[11px] text-[#90949C]">Resend available in {timer}s</p>
-                )}
+            </form>
+          ) : (
+            <form onSubmit={handleVerify} className="space-y-6">
+              <div className="flex justify-between gap-2">
+                {otp.map((digit, idx) => (
+                  <input
+                    key={idx} ref={(el) => (inputRefs.current[idx] = el)} type="text" inputMode="numeric" value={digit}
+                    onChange={(e) => handleChange(idx, e.target.value)} onKeyDown={(e) => handleKeyDown(idx, e)}
+                    className="w-full h-12 bg-[#F5F6F7] border-b-2 border-[#DDD] text-center text-lg font-bold focus:border-[#00A884] outline-none transition-all"
+                  />
+                ))}
               </div>
-            </div>
 
-            {step === 3 && (
-              <div className="p-4 bg-[#E7F3FF] border border-[#00A884]/20 rounded-md flex gap-3">
-                 <Smartphone className="text-[#00A884] shrink-0" size={18} />
-                 <p className="text-[11px] text-[#1C1E21] leading-relaxed">
-                   <b>Security Tip:</b> Open Telegram on your phone. A 6-digit verification code has been sent to your master node session.
-                 </p>
+              <div className="space-y-4">
+                <button disabled={loading || otp.join('').length < 6} className="w-full h-11 bg-[#1C1E21] hover:bg-black text-white font-bold rounded-lg transition-all flex items-center justify-center shadow-md">
+                  {loading ? <Loader2 className="animate-spin" size={18} /> : 'Verify Access'}
+                </button>
+                
+                <div className="text-center">
+                   {canResend ? (
+                      <button type="button" onClick={handleSendOtp} className="text-[10px] font-bold text-[#00A884] hover:underline flex items-center justify-center gap-1 mx-auto uppercase tracking-widest">
+                        <RefreshCw size={10} /> Sync New Code
+                      </button>
+                   ) : (
+                      <p className="text-[10px] font-bold text-[#90949C] uppercase tracking-widest">Sync available in {timer}s</p>
+                   )}
+                </div>
               </div>
-            )}
-          </form>
-        )}
-      </div>
 
-      <div className="mt-8 flex gap-6 text-[11px] text-[#90949C] font-bold uppercase tracking-wider">
-         <span>© 2026 BaseKey</span>
-         <span className="hover:text-[#00A884] cursor-pointer transition-colors">Documentation</span>
-         <span className="hover:text-[#00A884] cursor-pointer transition-colors">Privacy</span>
+              {step === 3 && (
+                <div className="p-4 bg-[#E7F3FF] border border-[#00A884]/20 rounded-lg flex gap-3">
+                   <Smartphone className="text-[#00A884] shrink-0" size={16} />
+                   <p className="text-[10px] text-[#1C1E21] leading-relaxed">
+                     <b>Telegram Active:</b> Secure codes are sent via your master node. Check your Telegram messages to continue.
+                   </p>
+                </div>
+              )}
+            </form>
+          )}
+        </div>
+
+        <div className="bg-[#F5F6F7] px-8 py-4 border-t border-[#DDD] flex justify-between items-center text-[9px] font-bold text-[#90949C] uppercase tracking-wider">
+           <span>BaseKey Node</span>
+           <Lock size={12} className="text-[#BEC3C9]" />
+        </div>
       </div>
     </div>
   );
-          }
-                    
+            }
+                      
