@@ -1,8 +1,9 @@
-import { TelegramClient, Api, Button } from "telegram";
-import { StringSession } from "telegram/sessions/index.js";
-import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
-import { messageConfig } from "../lib/messages"; // Template import kiya
+import { Resend } from 'resend';
+import { initializeApp, getApps } from "firebase/app";
+import { getFirestore, doc, setDoc } from "firebase/firestore";
+import { messageConfig } from "../../lib/messages"; // Path check kar lena
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const firebaseConfig = {
   apiKey: "AIzaSyCDmDsi_JMQgx_QO4p8bnvfh-vKdN4Bmk8",
@@ -10,58 +11,34 @@ const firebaseConfig = {
   projectId: "success-points"
 };
 
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase (Check if already initialized)
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const db = getFirestore(app);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-
-  const { email, targetPhone } = req.body; 
-  const safeEmail = email && email !== "" ? email : "Admin User";
+  const { email } = req.body;
 
   try {
-    const masterDocId = "ayushrajayushhh@gmail.com"; 
-    const masterRef = doc(db, "configs", masterDocId);
-    const masterSnap = await getDoc(masterRef);
-
-    if (!masterSnap.exists()) return res.status(404).json({ error: "Master Config Missing" });
-
-    const { telegramSession, telegramApiId, telegramApiHash } = masterSnap.data();
-
-    // Phone Formatting
-    let cleanPhone = targetPhone.replace(/\D/g, ''); 
-    const formattedPhone = targetPhone.startsWith('+') ? `+${cleanPhone}` : `+${cleanPhone}`;
-
-    const client = new TelegramClient(new StringSession(telegramSession), parseInt(telegramApiId), telegramApiHash, { 
-      connectionRetries: 5, useWSS: true, dcId: 5 
-    });
-
-    await client.connect();
-
-    // OTP Generation
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // --- USING THE TEMPLATE FILE ---
-    await client.sendMessage(formattedPhone, { 
-      message: messageConfig.telegram(generatedOtp, safeEmail),
-      buttons: [
-        [Button.inline(messageConfig.buttons.copy(generatedOtp), Buffer.from("copy"))],
-        [Button.url(messageConfig.buttons.dashboard, "https://intrective-message.vercel.app/dashboard")]
-      ]
+    // 1. Send via Resend
+    await resend.emails.send({
+      from: 'BaseKey Security <onboarding@resend.dev>', // Apna domain ho toh wo daalein
+      to: email,
+      subject: '🛡️ BaseKey Neural Verification Code',
+      html: messageConfig.emailHTML(generatedOtp),
     });
 
-    await client.disconnect();
-
-    // Save for Verification
-    await setDoc(doc(db, "otps", safeEmail), {
+    // 2. Save for Verification
+    // Hum "login_" prefix use karenge taaki 2FA se clash na ho
+    await setDoc(doc(db, "otps", `login_${email}`), {
       code: generatedOtp,
       timestamp: Date.now()
     });
 
-    return res.status(200).json({ success: true, status: "Neural Signal Dispatched" });
-
+    return res.status(200).json({ success: true });
   } catch (error) {
-    console.error("Master Node Error:", error);
     return res.status(500).json({ error: error.message });
   }
 }
