@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
-import { Mail, Smartphone, Bot, ChevronRight, Settings as SettingsIcon, Globe, Code } from 'lucide-react';
-import GmailSettings from './settings/GmailSettings'; // Modular import
+import { Mail, Smartphone, Bot, ChevronRight, ShieldCheck } from 'lucide-react';
+import GmailSettings from './settings/GmailSettings';
+import TwoFactorSettings from './settings/TwoFactorSettings'; // Naya import
 
 export default function Settings() {
-  const [currentView, setCurrentView] = useState('menu'); // 'menu' ya 'gmail'
+  const [currentView, setCurrentView] = useState('menu');
 
-  // Agar user ne Gmail par click kiya toh GmailSettings dikhao
+  // Views Logic
   if (currentView === 'gmail') {
     return <GmailSettings onBack={() => setCurrentView('menu')} />;
+  }
+  
+  if (currentView === '2fa') {
+    return <TwoFactorSettings onBack={() => setCurrentView('menu')} />;
   }
 
   return (
@@ -22,6 +27,14 @@ export default function Settings() {
           title="Gmail Node" 
           desc="Custom HTML templates & AI logic injection." 
           onClick={() => setCurrentView('gmail')}
+        />
+
+        {/* 2FA & PHONE LINK (NEW) */}
+        <SettingCard 
+          icon={<ShieldCheck className="text-blue-500" />} 
+          title="Security & 2FA" 
+          desc="Link Phone Number via Telegram OTP." 
+          onClick={() => setCurrentView('2fa')}
         />
 
         {/* WHATSAPP (COMING SOON) */}
@@ -44,6 +57,7 @@ export default function Settings() {
   );
 }
 
+// Card Component (Same as before)
 const SettingCard = ({ icon, title, desc, onClick, disabled = false }) => (
   <div 
     onClick={!disabled ? onClick : null}
