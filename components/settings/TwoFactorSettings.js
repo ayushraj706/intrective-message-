@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { ArrowLeft, ShieldCheck, Loader2, CheckCircle2, Power, Smartphone } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Loader2, CheckCircle2, Power, Smartphone, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Anti-crash dynamic import
+// Anti-crash for Next.js SSR
 const PhoneInput = dynamic(() => import('react-phone-input-2'), { ssr: false });
 import 'react-phone-input-2/lib/style.css';
 
@@ -18,11 +18,10 @@ export default function TwoFactorSettings({ onBack, userEmail = "" }) {
   const [syncing, setSyncing] = useState(true);
   const otpRefs = useRef([]);
 
-  // --- IDENTITY SYNC (DATABASE ONLY) ---
   useEffect(() => {
     setMounted(true);
     const fetchStatus = async () => {
-      // Email fetch logic
+      // LocalStorage access inside useEffect to prevent hydration error
       const emailToUse = userEmail || (typeof window !== 'undefined' ? localStorage.getItem('admin_email') : '');
       if (!emailToUse) {
         setSyncing(false);
@@ -44,27 +43,26 @@ export default function TwoFactorSettings({ onBack, userEmail = "" }) {
         setSyncing(false);
       }
     };
-
     fetchStatus();
   }, [userEmail]);
 
-  // --- OTP LOGIC ---
+  // --- OTP HELPERS ---
   const handleOtpChange = (index, value) => {
     if (!/^\d*$/.test(value)) return;
     const newOtp = [...otp];
     newOtp[index] = value.substring(value.length - 1);
     setOtp(newOtp);
-    if (value && index < 5) otpRefs.current[index + 1].focus();
+    if (value && index < 5) otpRefs.current[index + 1]?.focus();
   };
 
   const handleKeyDown = (index, e) => {
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      otpRefs.current[index - 1].focus();
+      otpRefs.current[index - 1]?.focus();
     }
   };
 
   const requestOtp = async () => {
-    if (phoneNumber.length < 10) return toast.error("Invalid phone sequence!");
+    if (phoneNumber.length < 10) return toast.error("Please enter a complete phone number.");
     setLoading(true);
     try {
       const emailToUse = userEmail || localStorage.getItem('admin_email');
@@ -77,31 +75,33 @@ export default function TwoFactorSettings({ onBack, userEmail = "" }) {
       if (data.success) {
         toast.success("Security code sent via Telegram.");
         setStep(2);
-      } else { toast.error(data.error); }
-    } catch (err) { toast.error("Connection link failed"); }
+      } else { toast.error(data.error || "Telegram node timeout."); }
+    } catch (err) { toast.error("Connection link failed."); }
     setLoading(false);
   };
 
   const verifyOtp = async () => {
+    const finalOtp = otp.join('');
+    if (finalOtp.length < 6) return toast.warning("Enter 6-digit code.");
     setLoading(true);
     try {
       const emailToUse = userEmail || localStorage.getItem('admin_email');
       const res = await fetch('/api/2fa-engine', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify', email: emailToUse, otp: otp.join(''), targetPhone: phoneNumber }),
+        body: JSON.stringify({ action: 'verify', email: emailToUse, otp: finalOtp, targetPhone: phoneNumber }),
       });
       const data = await res.json();
       if (data.success) {
         setIsVerified(true);
-        toast.success("Identity Verified!");
-      } else { toast.error(data.error); }
-    } catch (err) { toast.error("Verification error"); }
+        toast.success("Neural 2FA Activated!");
+      } else { toast.error(data.error || "Incorrect sequence."); }
+    } catch (err) { toast.error("Verification system error."); }
     setLoading(false);
   };
 
   const handleDisable = async () => {
-    if (!confirm("Disable 2FA? Security will be at risk.")) return;
+    if (!confirm("Deactivate 2FA? This will lower your account security.")) return;
     setLoading(true);
     try {
       const emailToUse = userEmail || localStorage.getItem('admin_email');
@@ -114,9 +114,10 @@ export default function TwoFactorSettings({ onBack, userEmail = "" }) {
         setIsVerified(false);
         setIs2FAEnabled(false);
         setStep(1);
-        toast.error("Security Node Offline");
+        setPhoneNumber('');
+        toast.error("2FA Node Deactivated.");
       }
-    } catch (err) { toast.error("Failed to disable"); }
+    } catch (err) { toast.error("Override failed."); }
     setLoading(false);
   };
 
@@ -124,110 +125,142 @@ export default function TwoFactorSettings({ onBack, userEmail = "" }) {
 
   if (syncing) {
     return (
-      <div className="min-h-screen bg-[#080808] flex items-center justify-center">
-        <Loader2 className="animate-spin text-blue-500" size={32} />
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="animate-spin text-[#00A884]" size={32} />
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Syncing Security Layers...</p>
       </div>
     );
   }
 
   return (
-    <div className="p-6 md:p-16 bg-[#080808] min-h-screen text-white font-sans selection:bg-[#00A884]/30">
-      <button onClick={onBack} className="flex items-center gap-2 text-zinc-600 hover:text-white mb-10 transition-colors">
-        <ArrowLeft size={18} />
-        <span className="text-[10px] font-black uppercase tracking-widest">Master Dashboard</span>
+    <div className="p-4 md:p-12 bg-[#F0F2F5] min-h-screen text-[#1C1E21] font-sans">
+      <button onClick={onBack} className="flex items-center gap-2 text-[#606770] hover:text-[#00A884] mb-8 font-bold text-xs uppercase transition-all">
+        <ArrowLeft size={16} /> Master Dashboard
       </button>
 
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center gap-6 mb-12">
-          <ShieldCheck className={isVerified ? "text-[#00A884]" : "text-zinc-800"} size={44} />
-          <h2 className="text-4xl font-black tracking-tighter uppercase italic">
-            Neural <span className="text-[#00A884]">2FA</span>
-          </h2>
+      <div className="max-w-2xl mx-auto">
+        <div className="flex items-center gap-4 mb-10">
+          <div className={`p-3 rounded-xl ${isVerified ? 'bg-[#00A884]/10 text-[#00A884]' : 'bg-gray-200 text-gray-500'}`}>
+            <ShieldCheck size={32} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Two-Step Verification</h2>
+            <p className="text-xs text-[#606770]">Add an extra layer of security to your administrative account.</p>
+          </div>
         </div>
 
-        <div className={`p-10 rounded-[2.5rem] border transition-all duration-700 ${isVerified ? 'bg-[#00A884]/5 border-[#00A884]/20' : 'bg-[#111] border-white/5 shadow-2xl'}`}>
-          
-          {/* HEADER: Toggle on the right side */}
-          <div className="flex items-center justify-between mb-10">
-            <div className="flex-1">
-              <h3 className="text-xl font-bold tracking-tight">Two-Factor Authentication</h3>
-              <p className={`text-[10px] uppercase tracking-[0.2em] mt-2 font-black ${isVerified ? 'text-[#00A884]' : 'text-red-600'}`}>
-                {isVerified ? 'System Status: Active' : 'System Status: Vulnerable'}
-              </p>
-            </div>
-            
-            {!isVerified && (
-               <button 
-                onClick={() => setIs2FAEnabled(!is2FAEnabled)}
-                className={`w-16 h-8 rounded-full transition-all relative flex items-center shrink-0 ${is2FAEnabled ? 'bg-[#00A884]' : 'bg-zinc-800'}`}
-              >
-                <div className={`absolute w-6 h-6 rounded-full bg-white transition-all shadow-md ${is2FAEnabled ? 'left-9' : 'left-1'}`} />
-              </button>
-            )}
-          </div>
-
-          {is2FAEnabled && !isVerified && (
-            <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
-              {step === 1 ? (
-                <div className="space-y-4">
-                  <div className="phone-meta-input">
-                    <PhoneInput
-                      country={'in'}
-                      value={phoneNumber}
-                      onChange={p => setPhoneNumber(p)}
-                      enableSearch={true}
-                      containerClass="!w-full"
-                      inputClass="!w-full !h-16 !bg-black !border-zinc-800 !text-white !rounded-2xl !pl-16 !text-lg"
-                      buttonClass="!bg-transparent !border-none !rounded-2xl !pl-4"
-                      dropdownClass="!bg-[#111] !text-white !border-zinc-800"
-                    />
-                  </div>
-                  <button onClick={requestOtp} disabled={loading} className="w-full bg-[#00A884] text-white font-black py-5 rounded-2xl uppercase tracking-widest active:scale-[0.98] transition-all">
-                    {loading ? <Loader2 className="animate-spin mx-auto" size={24} /> : 'Request Security Code'}
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-8 animate-in zoom-in duration-300">
-                   <div className="flex justify-between gap-2 md:gap-4">
-                     {otp.map((digit, i) => (
-                       <input
-                         key={i} ref={el => otpRefs.current[i] = el}
-                         type="text" value={digit}
-                         onChange={e => handleOtpChange(i, e.target.value)}
-                         onKeyDown={e => handleKeyDown(i, e)}
-                         className="w-full h-16 bg-black border border-zinc-800 rounded-2xl text-center text-3xl font-black focus:border-[#00A884] outline-none"
-                       />
-                     ))}
-                   </div>
-                   <button onClick={verifyOtp} disabled={loading} className="w-full bg-white text-black font-black py-5 rounded-2xl uppercase tracking-widest transition-all">
-                     Confirm Sequence
-                   </button>
-                </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-[#DDD] overflow-hidden">
+          <div className="p-8">
+            {/* TOGGLE SECTION */}
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex-1">
+                <h3 className="font-bold text-lg">2FA Security Node</h3>
+                <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${isVerified ? 'text-[#00A884]' : 'text-red-500'}`}>
+                  {isVerified ? 'Enabled • Secure' : 'Disabled • Vulnerable'}
+                </p>
+              </div>
+              
+              {!isVerified && (
+                <button 
+                  onClick={() => setIs2FAEnabled(!is2FAEnabled)}
+                  className={`w-14 h-7 rounded-full transition-all relative shrink-0 ${is2FAEnabled ? 'bg-[#00A884]' : 'bg-gray-300'}`}
+                >
+                  <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all shadow-sm ${is2FAEnabled ? 'left-8' : 'left-1'}`} />
+                </button>
               )}
             </div>
-          )}
 
-          {isVerified && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-5 p-6 bg-[#00A884]/10 border border-[#00A884]/20 rounded-2xl">
-                <CheckCircle2 className="text-[#00A884]" size={32} />
-                <p className="text-sm font-bold tracking-tight uppercase italic">Linked Node: +{phoneNumber}</p>
+            {is2FAEnabled && !isVerified && (
+              <div className="space-y-6 pt-6 border-t border-[#F0F2F5] animate-in slide-in-from-top duration-500">
+                {step === 1 ? (
+                  <div className="space-y-5">
+                    <div className="phone-meta-wrapper">
+                      <label className="text-[11px] font-bold text-[#4B4F56] uppercase mb-2 block ml-1">Connect Telegram Number</label>
+                      <PhoneInput
+                        country={'in'}
+                        value={phoneNumber}
+                        onChange={p => setPhoneNumber(p)}
+                        enableSearch={true}
+                        containerClass="!w-full"
+                        inputClass="!w-full !h-12 !bg-[#F5F6F7] !border-[#DDD] !rounded-lg !pl-14 !text-base focus:!border-[#00A884] focus:!ring-0"
+                        buttonClass="!bg-transparent !border-none !rounded-lg !pl-3"
+                        dropdownClass="!bg-white !shadow-xl !border-[#DDD] !rounded-lg"
+                      />
+                    </div>
+                    <button 
+                      onClick={requestOtp} 
+                      disabled={loading} 
+                      className="w-full h-12 bg-[#00A884] hover:bg-[#008F70] text-white font-bold rounded-lg shadow-sm transition-all active:scale-[0.98] flex items-center justify-center"
+                    >
+                      {loading ? <Loader2 className="animate-spin" size={20} /> : 'Send Verification Code'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-8 animate-in zoom-in duration-300">
+                    <div className="text-center">
+                      <p className="text-xs text-[#606770] mb-4">Enter the 6-digit code sent to your Telegram.</p>
+                      <div className="flex justify-between gap-2 max-w-xs mx-auto">
+                        {otp.map((digit, i) => (
+                          <input
+                            key={i} 
+                            ref={el => otpRefs.current[i] = el}
+                            type="text" 
+                            inputMode="numeric"
+                            value={digit}
+                            onChange={e => handleOtpChange(i, e.target.value)}
+                            onKeyDown={e => handleKeyDown(i, e)}
+                            className="w-full h-12 bg-[#F5F6F7] border-b-2 border-[#DDD] text-center text-xl font-bold focus:border-[#00A884] outline-none transition-all"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <button 
+                      onClick={verifyOtp} 
+                      disabled={loading} 
+                      className="w-full h-12 bg-[#1C1E21] hover:bg-black text-white font-bold rounded-lg shadow-md transition-all active:scale-[0.98]"
+                    >
+                      {loading ? <Loader2 className="animate-spin" size={20} /> : 'Confirm Identity'}
+                    </button>
+                    <button onClick={() => setStep(1)} className="w-full text-xs font-bold text-[#00A884] hover:underline">Change Number</button>
+                  </div>
+                )}
               </div>
-              <button onClick={handleDisable} disabled={loading} className="w-full py-4 bg-red-600/10 border border-red-600/20 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all">
-                 Deactivate 2FA Node
-              </button>
-            </div>
-          )}
+            )}
+
+            {isVerified && (
+              <div className="space-y-6 pt-6 border-t border-[#F0F2F5]">
+                <div className="flex items-center gap-4 p-4 bg-[#E7F3FF] border border-[#00A884]/10 rounded-xl">
+                  <CheckCircle2 className="text-[#00A884]" size={24} />
+                  <p className="text-sm font-bold text-[#1C1E21]">Verified: +{phoneNumber}</p>
+                </div>
+                <button 
+                  onClick={handleDisable} 
+                  disabled={loading} 
+                  className="w-full h-11 border border-red-100 text-red-500 font-bold rounded-lg text-xs uppercase tracking-widest hover:bg-red-50 transition-all flex items-center justify-center gap-2"
+                >
+                  {loading ? <Loader2 className="animate-spin" size={16} /> : <Power size={14} />} Disable Verification
+                </button>
+              </div>
+            )}
+          </div>
+          
+          <div className="bg-[#F5F6F7] p-4 flex gap-3 items-start">
+             <Info size={16} className="text-[#606770] shrink-0 mt-0.5" />
+             <p className="text-[11px] text-[#606770] leading-relaxed">
+               Two-step verification adds more security to your account by requiring a security code whenever you log in from a new node.
+             </p>
+          </div>
         </div>
       </div>
 
       <style jsx global>{`
-        .phone-meta-input .country-list { background: #111 !important; color: white !important; }
-        .phone-meta-input .country-list .search { background: #111 !important; }
-        .phone-meta-input .country-list .search-box { background: black !important; color: white !important; border: 1px solid #333 !important; }
-        .phone-meta-input .country-list .country:hover { background: rgba(0, 168, 132, 0.1) !important; }
+        .phone-meta-wrapper .country-list { background: white !important; color: #1C1E21 !important; }
+        .phone-meta-wrapper .country-list .search { background: #F5F6F7 !important; padding: 10px !important; }
+        .phone-meta-wrapper .country-list .search-box { background: white !important; border: 1px solid #DDD !important; width: 90% !important; border-radius: 6px !important; }
+        .phone-meta-wrapper .country-list .country:hover { background: #F0F2F5 !important; }
+        .phone-meta-wrapper .country-list .country.highlight { background: #E7F3FF !important; color: #00A884 !important; }
       `}</style>
     </div>
   );
-                              }
-            
+                          }
+                                 
