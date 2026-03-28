@@ -3,7 +3,7 @@ import { StringSession } from "telegram/sessions/index.js";
 import admin from 'firebase-admin';
 import { messageConfig } from "../../lib/messages";
 
-// Firebase Admin Init
+// Firebase Admin Initialization
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT))
@@ -19,12 +19,15 @@ export default async function handler(req, res) {
   const docId = `2fa_${cleanEmail}`;
 
   try {
+    // --- ACTION: SEND (Requesting 2FA Code) ---
     if (action === 'send') {
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
       
+      // Phone number ko bhi save karein taaki verify ke waqt link ho sake
       await db.collection('otps').doc(docId).set({
         otp: generatedOtp,
         expiresAt: Date.now() + 300000,
+        targetPhone: targetPhone, // Neutral Link: Saving phone for later
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
@@ -39,23 +42,17 @@ export default async function handler(req, res) {
       );
 
       await client.connect();
-
-      // --- NEURAL FIX: Dynamic Import for Button ---
-      // Vercel bundle error se bachne ke liye hum ise yahan require kar rahe hain
       const { Button } = require("telegram/tl/custom/button");
-
       const formattedPhone = `+${targetPhone.replace(/\D/g, '')}`;
 
-      // Agar Button phir bhi na mile, toh bina button ke message bhej do (Safety Fallback)
       if (Button && Button.inline) {
         await client.sendMessage(formattedPhone, {
           message: messageConfig.telegram(generatedOtp, cleanEmail),
           buttons: [[Button.inline(`📋 Copy Code: ${generatedOtp}`, Buffer.from(generatedOtp))]]
         });
       } else {
-        // Fallback: Plain text message agar UI component fail ho jaye
         await client.sendMessage(formattedPhone, {
-          message: `${messageConfig.telegram(generatedOtp, cleanEmail)}\n\n(Button failed to load, please copy manually)`
+          message: `${messageConfig.telegram(generatedOtp, cleanEmail)}\n\n(Code: ${generatedOtp})`
         });
       }
 
@@ -63,13 +60,31 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
+    // --- ACTION: VERIFY (Activating 2FA Permanently) ---
     if (action === 'verify') {
       const otpDoc = await db.collection('otps').doc(docId).get();
-      if (otpDoc.exists && otpDoc.data().otp === otp) {
-        await db.collection('otps').doc(docId).delete();
-        return res.status(200).json({ success: true });
-      }
-      return res.status(400).json({ error: "Invalid Code" });
+      
+      if (!otpDoc.exists) return res.status(404).json({ error: "Code expired ya invalid." });
+
+      const data = otpDoc.data();
+      if (data.otp !== otp) return res.status(400).json({ error: "Incorrect Security Code." });
+      if (Date.now() > data.expiresAt) return res.status(400).json({ error: "Code Expired." });
+
+      // --- NEURAL FIX: DATABASE UPDATE ---
+      // Ab ye status hamesha ke liye Firestore mein save hoga
+      await db.collection('users').doc(cleanEmail).set({
+        twoFactorEnabled: true,
+        phoneNumber: data.targetPhone, // Phone number linked permanently
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      // Clean up OTP document
+      await db.collection('otps').doc(docId).delete();
+
+      return res.status(200).json({ 
+        success: true, 
+        message: "2FA Protocol Activated Permanently." 
+      });
     }
 
   } catch (error) {
