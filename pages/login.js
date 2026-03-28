@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { auth } from '../firebase'; 
 import { signInWithCustomToken } from 'firebase/auth';
 import { ShieldCheck, Loader2, Mail, ArrowLeft, Fingerprint, RefreshCw } from 'lucide-react';
-import { toast } from 'sonner'; // Sonner import kiya gaya
+import { toast } from 'sonner';
 
 export default function Login() {
   const router = useRouter();
@@ -13,7 +13,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const inputRefs = useRef([]);
 
-  // --- TIMER LOGIC FOR RESEND OTP ---
   const [timer, setTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
 
@@ -29,14 +28,22 @@ export default function Login() {
     return () => clearInterval(interval);
   }, [step, timer]);
 
-  // Numeric Keypad aur Typing Logic
+  // --- NEURAL SMART PASTE ---
+  const handlePaste = (e) => {
+    const data = e.clipboardData.getData('text').trim();
+    if (data.length === 6 && /^\d+$/.test(data)) {
+      const pasteOtp = data.split('');
+      setOtp(pasteOtp);
+      inputRefs.current[5].focus();
+      toast.success("Code Automatically Pasted!");
+    }
+  };
+
   const handleChange = (index, value) => {
     if (!/^\d*$/.test(value)) return;
-
     const newOtp = [...otp];
     newOtp[index] = value.substring(value.length - 1);
     setOtp(newOtp);
-
     if (value && index < 5) {
       inputRefs.current[index + 1].focus();
     }
@@ -50,27 +57,33 @@ export default function Login() {
 
   const handleSendOtp = async (e) => {
     if (e) e.preventDefault();
-    if (!email.trim()) return toast.warning("Email dalna zaroori hai!");
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) return toast.warning("Email dalna zaroori hai!");
 
     setLoading(true);
     try {
-      const res = await fetch('/api/send-otp', {
+      // Ab hum 'send-master-otp' use karenge jo Telegram + Email handle karta hai
+      const res = await fetch('/api/send-master-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ 
+          email: cleanEmail,
+          targetPhone: "919229966001", // Aapka primary number
+          type: 'login' // Signal for backend separation
+        }),
       });
       const data = await res.json();
       
       if (data.success) {
-        toast.success("OTP Bhej diya gaya hai!", { description: "Apna email inbox check karein." });
+        toast.success("Neural Code Dispatched!", { description: "Check Telegram or Email." });
         setStep(2);
-        setTimer(30); // Reset timer
+        setTimer(30);
         setCanResend(false);
       } else {
-        toast.error(data.error || "OTP bhejne mein dikkat aayi.");
+        toast.error(data.error || "Master Node is busy.");
       }
     } catch (err) { 
-      toast.error("Server Error", { description: "Internet connection check karein." }); 
+      toast.error("Connection Failed", { description: "Check your internet." }); 
     }
     setLoading(false);
   };
@@ -78,13 +91,14 @@ export default function Login() {
   const handleResendOtp = async () => {
     setTimer(30);
     setCanResend(false);
-    toast.info("Naya OTP bhej rahe hain...");
+    toast.info("Resending Neural Code...");
     await handleSendOtp();
   };
 
   const handleVerifyOtp = async (e) => {
     if (e) e.preventDefault();
     const finalOtp = otp.join('');
+    const cleanEmail = email.trim().toLowerCase();
     
     if (finalOtp.length < 6) return toast.warning("Poora 6-digit OTP daalein!");
 
@@ -93,18 +107,22 @@ export default function Login() {
       const res = await fetch('/api/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp: finalOtp }),
+        body: JSON.stringify({ 
+          email: cleanEmail, 
+          otp: finalOtp,
+          type: 'login' // Ensure we match the login prefix
+        }),
       });
       const data = await res.json();
       
       if (data.success && data.token) {
-        toast.success("Identity Verified!", { description: "Secure link established." });
+        toast.success("Identity Verified!");
         await signInWithCustomToken(auth, data.token);
-        localStorage.setItem('admin_email', email); 
+        localStorage.setItem('admin_email', cleanEmail); 
         localStorage.setItem('basekey_session', 'authenticated');
         router.push('/dashboard');
       } else {
-        toast.error(data.error || "Galat OTP! Wapas try karein.");
+        toast.error(data.error || "Invalid or Expired Code.");
       }
     } catch (err) { 
         toast.error("Verification Error", { description: err.message }); 
@@ -113,8 +131,8 @@ export default function Login() {
   };
 
   return (
-    // Light & Dark mode support added: bg-zinc-50 (Light) and dark:bg-[#020202] (Dark)
     <div className="min-h-screen bg-zinc-50 dark:bg-[#020202] flex items-center justify-center p-6 text-zinc-900 dark:text-white font-sans overflow-hidden transition-colors duration-500">
+      
       {/* Background Glow */}
       <div className="fixed inset-0 pointer-events-none flex items-center justify-center">
         <div className="w-[80vw] h-[80vw] md:w-[40vw] md:h-[40vw] bg-blue-600/10 blur-[120px] rounded-full"></div>
@@ -132,12 +150,12 @@ export default function Login() {
           {step === 1 ? <ShieldCheck size={40} /> : <Fingerprint size={40} className="animate-pulse" />}
         </div>
         
-        <h1 className="text-4xl font-black mb-2 tracking-tighter italic uppercase">Base<span className="text-blue-600">Key</span></h1>
+        <h1 className="text-4xl font-black mb-2 tracking-tighter italic uppercase underline-offset-8">Base<span className="text-blue-600">Key</span></h1>
         
         {step === 1 ? (
            <p className="text-zinc-500 dark:text-zinc-400 mb-10 text-[10px] uppercase tracking-[0.3em] font-bold">Secure Admin Neural Link</p>
         ) : (
-           <p className="text-zinc-500 dark:text-zinc-400 mb-10 text-xs font-medium">OTP sent to <span className="font-bold text-zinc-900 dark:text-white">{email}</span></p>
+           <p className="text-zinc-500 dark:text-zinc-400 mb-10 text-xs font-medium italic opacity-80 underline underline-offset-4 decoration-blue-500/30">{email}</p>
         )}
 
         {/* STEP 1: EMAIL INPUT */}
@@ -169,9 +187,8 @@ export default function Login() {
                   ref={(el) => (inputRefs.current[idx] = el)}
                   type="text"
                   inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={1} 
                   value={digit}
+                  onPaste={idx === 0 ? handlePaste : undefined}
                   onChange={(e) => handleChange(idx, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(idx, e)}
                   className="w-full h-14 md:h-16 bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-white/10 rounded-2xl text-center text-2xl font-black focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all caret-blue-500 shadow-inner"
@@ -179,7 +196,6 @@ export default function Login() {
               ))}
             </div>
 
-            {/* Timer & Resend Logic */}
             <div className="flex items-center justify-center text-xs font-bold">
                {canResend ? (
                  <button type="button" onClick={handleResendOtp} className="text-blue-600 hover:text-blue-500 flex items-center gap-2 transition-colors">
@@ -187,7 +203,7 @@ export default function Login() {
                  </button>
                ) : (
                  <span className="text-zinc-400 flex items-center gap-2">
-                   <Loader2 size={12} className="animate-spin" /> Resend code in 00:{timer < 10 ? `0${timer}` : timer}
+                   <Loader2 size={12} className="animate-spin" /> Resend in 00:{timer < 10 ? `0${timer}` : timer}
                  </span>
                )}
             </div>
