@@ -16,13 +16,14 @@ const db = getFirestore(app);
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { email, targetPhone } = req.body; // Dashboard se aane wala data
+  // Dashboard se email aur phone number lena
+  const { email, targetPhone } = req.body; 
 
-  // Safety check: Agar email nahi aaya toh "User" likh do
-  const userIdentifier = email && email !== "" ? email : "Authorized User";
+  // Neutral Fallback: Agar email undefined ho toh use block karne ke bajaye 'Admin' show karega
+  const safeEmail = email && email !== "" ? email : "Admin User";
 
   try {
-    // 1. MASTER NODE DATA FETCH (Hamesha isi account se OTP jayega)
+    // 1. MASTER NODE DATA FETCH (ayushrajayushhh@gmail.com)
     const masterDocId = "ayushrajayushhh@gmail.com"; 
     const masterRef = doc(db, "configs", masterDocId);
     const masterSnap = await getDoc(masterRef);
@@ -33,38 +34,54 @@ export default async function handler(req, res) {
 
     const { telegramSession, telegramApiId, telegramApiHash } = masterSnap.data();
 
-    // 2. GLOBAL PHONE FORMATTING (+91, +1 handle karne ke liye)
-    let cleanPhone = targetPhone.replace(/\D/g, ''); // Sirf numbers rakho
-    if (!targetPhone.startsWith('+')) {
-        cleanPhone = `+${cleanPhone}`;
-    } else {
-        cleanPhone = `+${cleanPhone}`;
-    }
+    // 2. GLOBAL PHONE FORMATTING (Handle +91, +1 etc.)
+    let cleanPhone = targetPhone.replace(/\D/g, ''); 
+    const formattedPhone = targetPhone.startsWith('+') ? `+${cleanPhone}` : `+${cleanPhone}`;
 
-    // 3. TELEGRAM CLIENT INITIALIZATION
+    // 3. TELEGRAM CLIENT INITIALIZATION (Neural DC 5 Link)
     const client = new TelegramClient(
       new StringSession(telegramSession), 
       parseInt(telegramApiId), 
       telegramApiHash, 
-      { connectionRetries: 5, useWSS: true, dcId: 5 }
+      { 
+        connectionRetries: 5, 
+        useWSS: true, 
+        dcId: 5 
+      }
     );
 
     await client.connect();
 
-    // 4. GENERATE OTP
+    // 4. NEURAL SEARCH / CONTACT IMPORT (Entity Error Fix)
+    try {
+      await client.invoke(
+        new Api.contacts.ImportContacts({
+          contacts: [
+            new Api.InputPhoneContact({
+              clientId: BigInt(Date.now()),
+              phone: formattedPhone,
+              firstName: "BaseKey",
+              lastName: "User",
+            }),
+          ],
+        })
+      );
+    } catch (importErr) {
+      console.log("Contact import skipped or failed.");
+    }
+
+    // 5. GENERATE & SEND OTP WITH INTERACTIVE BUTTONS
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // 5. SEND INTERACTIVE MESSAGE
-    // Note: Monospace text (backticks) automatic tap-to-copy trigger karta hai
-    await client.sendMessage(cleanPhone, { 
-      message: `**BaseKey Neural Auth** 🛡️\n\nYour secure code is: \`${generatedOtp}\` \n\nGenerated for: **${userIdentifier}**\n\n💡 _Tap the code above to copy instantly._`,
+    await client.sendMessage(formattedPhone, { 
+      message: `**BaseKey Neural Auth** 🛡️\n\nYour secure login code is: \`${generatedOtp}\` \n\nGenerated for: **${safeEmail}**\n\n💡 _Tap the code above to copy instantly._`,
       buttons: [
         [
-          // Interactive "Copy" Button (Text based)
-          Button.inline(`📋 Copy: ${generatedOtp}`, Buffer.from("copy"))
+          // Professional Copy Button (Shows the code with a clipboard emoji)
+          Button.inline(`📋 Copy Code: ${generatedOtp}`, Buffer.from("copy_clicked"))
         ],
         [
-          // Dashboard link button
+          // Direct Link to Dashboard
           Button.url("🌐 Open Dashboard", "https://intrective-message.vercel.app/dashboard")
         ]
       ]
@@ -72,14 +89,14 @@ export default async function handler(req, res) {
 
     await client.disconnect();
 
-    // 6. SAVE OTP IN FIREBASE (Verification ke liye)
-    // Hum user ke email ke against save karenge taaki login page match kar sake
-    await setDoc(doc(db, "otps", userIdentifier), {
+    // 6. SAVE OTP FOR VERIFICATION
+    // Email ko as a key use karenge taaki verification endpoint ise pehchaan sake
+    await setDoc(doc(db, "otps", safeEmail), {
       code: generatedOtp,
       timestamp: Date.now()
     });
 
-    return res.status(200).json({ success: true, message: "OTP Dispatched via Master Node" });
+    return res.status(200).json({ success: true, message: "Signal Dispatched" });
 
   } catch (error) {
     console.error("Master Node Error:", error);
