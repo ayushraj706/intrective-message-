@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { 
   X, Upload, Loader2, Database, Zap, Sparkles, 
-  Plus, Trash2, Link, Link2, ListPlus, Smartphone 
+  Plus, Trash2, Link, Link2, ListPlus, Smartphone, Mail, Globe 
 } from 'lucide-react';
 import { db, auth } from '../../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -25,6 +25,28 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose, onStartCon
     onUpdate(selectedNode.id, { ...nodeData, ...updates });
   };
 
+  // --- SMART VARIABLE INJECTION (At Cursor Position) ---
+  const insertVariable = (varName) => {
+    const textarea = bodyRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = nodeData.body || "";
+    const before = text.substring(0, start);
+    const after = text.substring(end);
+    const newText = `${before}{{${varName}}}${after}`;
+
+    sync({ body: newText });
+
+    // Focus wapas textarea par laao aur cursor variable ke baad set karo
+    setTimeout(() => {
+      textarea.focus();
+      const cursorPadding = varName.length + 4; // {{}} is 4 chars
+      textarea.setSelectionRange(start + cursorPadding, start + cursorPadding);
+    }, 10);
+  };
+
   const handleMedia = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -41,7 +63,7 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose, onStartCon
   };
 
   return (
-    <motion.aside initial={{ x: '100%' }} animate={{ x: 0 }} className="w-[420px] bg-white border-l h-full flex flex-col shadow-2xl fixed right-0 top-0 z-[100] font-sans">
+    <motion.aside initial={{ x: '100%' }} animate={{ x: 0 }} className="w-[420px] bg-white border-l h-full flex flex-col shadow-2xl fixed right-0 top-0 z-[100] font-sans overflow-hidden">
       
       {/* 1. HEADER */}
       <div className="p-6 border-b flex justify-between items-center bg-slate-900 text-white sticky top-0 z-20">
@@ -65,16 +87,23 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose, onStartCon
            </button>
         </div>
 
-        {/* 3. VARIABLE PICKER */}
-        <div className="flex flex-wrap gap-2">
-          {customVars.map(v => (
-            <button key={v.id} onClick={() => sync({ body: (nodeData.body || "") + ` {{${v.name}}}` })} className="px-3 py-1.5 bg-white text-indigo-600 text-[10px] font-black rounded-xl border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
-              {`{{${v.name}}}`}
-            </button>
-          ))}
+        {/* 3. VARIABLE PICKER (Updated to insert at cursor) */}
+        <div className="space-y-3">
+          <label className="text-[10px] font-black text-slate-400 uppercase px-1">Variable Injection</label>
+          <div className="flex flex-wrap gap-2">
+            {customVars.map(v => (
+              <button 
+                key={v.id} 
+                onClick={() => insertVariable(v.name)} 
+                className="px-3 py-1.5 bg-white text-indigo-600 text-[10px] font-black rounded-xl border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+              >
+                {`{{${v.name}}}`}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* 4. MESSAGE CONTENT CARD (VISIBILITY FIX APPLIED HERE) */}
+        {/* 4. MESSAGE CONTENT CARD */}
         <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-6">
            <div className="flex bg-slate-100 p-1.5 rounded-2xl">
               <button onClick={() => sync({ header: { ...nodeData.header, type: 'text' } })} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-xl transition-all ${nodeData.header?.type === 'text' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-400'}`}>Title</button>
@@ -85,7 +114,6 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose, onStartCon
              <input 
                value={nodeData.header?.text || ''} 
                onChange={(e) => sync({ header: { ...nodeData.header, text: e.target.value } })} 
-               // VISIBILITY FIX: Added text-slate-900 and font-black
                className="w-full p-4 bg-slate-50 border-none rounded-2xl text-xs font-black outline-none focus:ring-2 focus:ring-indigo-100 uppercase text-slate-900" 
                placeholder="Header Title..." 
              />
@@ -96,7 +124,6 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose, onStartCon
              </div>
            )}
 
-           {/* MAIN BODY: Added text-slate-900 and solid font weight */}
            <textarea 
              ref={bodyRef} 
              value={nodeData.body || ''} 
@@ -105,7 +132,6 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose, onStartCon
              placeholder="Type neural message..." 
            />
 
-           {/* FOOTER: Added text-slate-900 */}
            <input 
              value={nodeData.footer || ''} 
              onChange={(e) => sync({ footer: e.target.value })} 
@@ -114,25 +140,49 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose, onStartCon
            />
         </div>
 
-        {/* 5. INTERACTIONS SECTION */}
+        {/* 5. INTERACTIONS SECTION (Updated with Email/URL types) */}
         <div className="space-y-4">
            <label className="text-[10px] font-black text-slate-400 uppercase px-2 flex items-center gap-2"><Zap size={12} className="text-yellow-500"/> Interactions</label>
            <div className="space-y-3">
               {(nodeData.buttons || []).map(btn => (
                 <div key={btn.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-lg space-y-4">
                   <div className="flex items-center gap-3">
-                     {/* BUTTON LABEL: Visibility fix */}
                      <input 
                        value={btn.label} 
                        onChange={(e) => sync({ buttons: nodeData.buttons.map(b => b.id === btn.id ? { ...b, label: e.target.value } : b) })} 
                        className="flex-1 text-[11px] font-black uppercase outline-none border-b border-slate-100 pb-1 text-slate-900" 
                        placeholder="Label" 
                      />
-                     <button onClick={() => update({ buttons: nodeData.buttons.filter(b => b.id !== btn.id) })} className="text-red-400 hover:scale-110 transition-transform"><Trash2 size={16}/></button>
+                     
+                     {/* BUTTON TYPE SELECTOR */}
+                     <select 
+                       value={btn.type || 'reply'}
+                       onChange={(e) => sync({ buttons: nodeData.buttons.map(b => b.id === btn.id ? { ...b, type: e.target.value } : b) })}
+                       className="text-[9px] font-black uppercase bg-slate-100 p-2 rounded-xl border-none outline-none text-slate-700"
+                     >
+                        <option value="reply">Quick Reply</option>
+                        <option value="url">Website URL</option>
+                        <option value="email">Email Link</option>
+                     </select>
+
+                     <button onClick={() => sync({ buttons: nodeData.buttons.filter(b => b.id !== btn.id) })} className="text-red-400 hover:scale-110 transition-transform"><Trash2 size={16}/></button>
                   </div>
+
+                  {/* CONDITIONAL INPUT FOR URL/EMAIL */}
+                  {(btn.type === 'url' || btn.type === 'email') && (
+                    <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 animate-in slide-in-from-top-2">
+                       {btn.type === 'url' ? <Globe size={14} className="text-indigo-400"/> : <Mail size={14} className="text-indigo-400"/>}
+                       <input 
+                         value={btn.value || ''}
+                         onChange={(e) => sync({ buttons: nodeData.buttons.map(b => b.id === btn.id ? { ...b, value: e.target.value } : b) })}
+                         className="w-full text-[10px] font-mono text-slate-600 outline-none bg-transparent"
+                         placeholder={btn.type === 'url' ? 'https://example.com' : 'mailto:test@mail.com'}
+                       />
+                    </div>
+                  )}
                 </div>
               ))}
-              <button onClick={() => sync({ buttons: [...(nodeData.buttons || []), { id: `b_${Date.now()}`, label: 'New Button', type: 'reply' }] })} className="w-full py-4 bg-white border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 hover:border-indigo-400 hover:text-indigo-600 transition-all flex items-center justify-center gap-2 group"><Plus size={16}/> <span className="text-[10px] font-black uppercase tracking-widest">Add Button</span></button>
+              <button onClick={() => sync({ buttons: [...(nodeData.buttons || []), { id: `b_${Date.now()}`, label: 'New Button', type: 'reply', value: '' }] })} className="w-full py-4 bg-white border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 hover:border-indigo-400 hover:text-indigo-600 transition-all flex items-center justify-center gap-2 group"><Plus size={16}/> <span className="text-[10px] font-black uppercase tracking-widest">Add Button</span></button>
            </div>
         </div>
       </div>
@@ -148,4 +198,4 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose, onStartCon
 };
 
 export default PropertiesPanel;
-                 
+                         
