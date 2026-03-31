@@ -1,235 +1,98 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import ReactFlow, { 
-  ReactFlowProvider, 
-  addEdge, 
-  Background, 
-  Controls, 
-  MiniMap, 
-  useNodesState, 
-  useEdgesState, 
-  useReactFlow 
-} from 'reactflow';
+import React, { useState, useCallback, useEffect } from 'react';
+import ReactFlow, { ReactFlowProvider, addEdge, Background, Controls, useNodesState, useEdgesState, useReactFlow } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Save, Loader2, Maximize, Zap, ZapOff } from 'lucide-react';
-
-// Firebase Imports
+import { Save, Loader2, Maximize, MousePointer2, Link2 } from 'lucide-react';
 import { db, auth } from '../../firebase'; 
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
-// Node Components
 import WhatsAppNode from './WhatsAppNode';
 import StartNode from './StartNode';
 import ListNode from './ListNode'; 
 import FlowSidebar from './Sidebar';
 import PropertiesPanel from './PropertiesPanel';
 
-// Node Types Registry
-const nodeTypes = { 
-  whatsappNode: WhatsAppNode, 
-  startNode: StartNode,
-  listNode: ListNode 
-};
+const nodeTypes = { whatsappNode: WhatsAppNode, startNode: StartNode, listNode: ListNode };
 
 const FlowBuilderContent = () => {
-  const reactFlowWrapper = useRef(null);
-  const { setCenter, screenToFlowPosition, toObject, fitView } = useReactFlow(); 
-  
+  const { setCenter, toObject, fitView } = useReactFlow(); 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const [connectSource, setConnectSource] = useState(null); // Connection start point
   const [isSaving, setIsSaving] = useState(false);
-  const [isBotActive, setIsBotActive] = useState(false);
 
-  // 1. Firebase se Flow Data load karna
-  useEffect(() => {
-    const loadFlow = async () => {
-      if (!auth.currentUser) return;
-      try {
-        const docRef = doc(db, "users", auth.currentUser.uid, "flows", "main_flow");
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          const { flowData, isActive } = docSnap.data();
-          if (flowData?.nodes?.length > 0) {
-            setNodes(flowData.nodes);
-            setEdges(flowData.edges || []);
-          } else {
-            // Agar flow khali hai toh default Start Node dikhao
-            setNodes([{ 
-              id: 'start_0', 
-              type: 'startNode', 
-              position: { x: 50, y: 150 }, 
-              data: { title: 'START ROOT' } 
-            }]);
-          }
-          setIsBotActive(isActive || false);
-        }
-      } catch (e) { 
-        console.error("Firebase Load Error:", e);
-      }
-    };
-    loadFlow();
-  }, [auth.currentUser, setNodes, setEdges]);
+  // 1. CLICK TO CONNECT LOGIC (Mobile Special)
+  const onNodeClick = useCallback((event, node) => {
+    if (connectSource && connectSource !== node.id) {
+      // Agar pehle se ek source select hai, toh connection bana do
+      const newEdge = { 
+        id: `e-${connectSource}-${node.id}`, 
+        source: connectSource, 
+        target: node.id,
+        animated: true,
+        style: { stroke: '#6366f1', strokeWidth: 3 }
+      };
+      setEdges((eds) => addEdge(newEdge, eds));
+      setConnectSource(null); // Reset karo
+    } else {
+      setSelectedNodeId(node.id);
+      setCenter(node.position.x + 250, node.position.y + 100, { zoom: 1.2, duration: 800 });
+    }
+  }, [connectSource, setEdges, setCenter]);
 
-  // 2. NEURAL SYNC LOGIC: Canvas ko real-time refresh karne wala function
-  const updateNodeData = useCallback((nodeId, newData) => {
-    setNodes((nds) => 
-      nds.map((node) => {
-        if (node.id === nodeId) {
-          // ZAROORI: Naya Object reference generate karna taaki React Flow refresh ho
-          return { 
-            ...node, 
-            data: { ...node.data, ...newData } 
-          };
-        }
-        return node;
-      })
-    );
-  }, [setNodes]);
-
-  // 3. Naya Node add karne ka logic (Click aur Drag dono ke liye)
-  const addNewNode = useCallback((type, position = null) => {
+  const addNewNode = (type) => {
     const id = `node_${Date.now()}`;
-    // Click hone par random middle position, Drop hone par cursor position
-    const spawnPos = position || { 
-      x: Math.random() * 200 + 300, 
-      y: Math.random() * 200 + 200 
-    };
-    
-    // Default Data Structure for New Nodes
-    const defaultData = type === 'listNode' ? {
-      header: { type: 'text', text: 'LIST TITLE' },
-      body: 'Select an option from the menu:',
-      footer: 'BaseKey List Menu',
-      listButton: 'View Menu',
-      listRows: [{ id: `r_${Date.now()}`, title: 'Option 1', desc: 'Description' }]
-    } : {
-      header: { type: 'text', text: 'MESSAGE TITLE' },
-      body: 'Type your business message here...',
-      footer: '',
-      buttons: []
-    };
-
     const newNode = {
-      id,
-      type: type || 'whatsappNode',
-      position: spawnPos,
-      data: defaultData,
+      id, type, 
+      position: { x: window.innerWidth / 4, y: window.innerHeight / 4 }, 
+      data: { header: { type: 'text', text: 'NEW' }, body: 'Tap to edit...', buttons: [] }
     };
     setNodes((nds) => nds.concat(newNode));
-  }, [setNodes]);
-
-  // 4. Drag & Drop Handlers
-  const onDragOver = useCallback((event) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  }, []);
-
-  const onDrop = useCallback((event) => {
-    event.preventDefault();
-    const type = event.dataTransfer.getData('application/reactflow');
-    if (!type) return;
-
-    const position = screenToFlowPosition({
-      x: event.clientX,
-      y: event.clientY,
-    });
-
-    addNewNode(type, position);
-  }, [screenToFlowPosition, addNewNode]);
-
-  // 5. Deploy/Save Function
-  const saveFlow = async () => {
-    if (!auth.currentUser) return;
-    setIsSaving(true);
-    try {
-      await setDoc(doc(db, "users", auth.currentUser.uid, "flows", "main_flow"), {
-        flowData: toObject(),
-        updatedAt: new Date().toISOString(),
-        isActive: isBotActive
-      }, { merge: true });
-    } catch (e) { 
-      console.error("Save Error:", e); 
-    }
-    setIsSaving(false);
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
-      {/* Sidebar with Add Logic */}
+    <div className="flex h-screen bg-slate-50 overflow-hidden">
       <FlowSidebar onAddNode={addNewNode} /> 
-
-      <div className="flex-1 relative" ref={reactFlowWrapper}>
-        {/* Floating Top UI */}
-        <div className="absolute top-6 left-6 right-6 z-50 flex justify-between items-center pointer-events-none">
-          <div className="flex gap-3 pointer-events-auto">
-             <button 
-               onClick={() => fitView({ padding: 0.3, duration: 800 })} 
-               className="p-3 bg-white rounded-2xl shadow-xl border border-slate-100 text-slate-600 hover:text-indigo-600 transition-all active:scale-90"
-             >
-               <Maximize size={20} />
-             </button>
+      <div className="flex-1 relative">
+        {/* Connection Mode Indicator */}
+        {connectSource && (
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[60] bg-indigo-600 text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl animate-bounce flex items-center gap-2">
+            <Link2 size={14}/> Tap Destination Node to Connect
           </div>
+        )}
 
-          <button 
-            onClick={saveFlow} 
-            disabled={isSaving} 
-            className="pointer-events-auto flex items-center gap-3 px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-indigo-600 transition-all active:scale-95"
-          >
-            {isSaving ? <Loader2 className="animate-spin" size={16}/> : <Save size={16}/>} 
-            Deploy Architecture
+        <div className="absolute top-6 left-6 right-6 z-50 flex justify-between pointer-events-none">
+          <button onClick={() => fitView()} className="pointer-events-auto p-3 bg-white rounded-2xl shadow-xl"><Maximize size={20} /></button>
+          <button onClick={async () => { setIsSaving(true); await setDoc(doc(db, "users", auth.currentUser.uid, "flows", "main_flow"), { flowData: toObject() }, { merge: true }); setIsSaving(false); }} className="pointer-events-auto flex items-center gap-3 px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-2xl">
+            {isSaving ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>} Deploy Architecture
           </button>
         </div>
 
-        {/* Main React Flow Canvas */}
         <ReactFlow
-          nodes={nodes} 
-          edges={edges} 
-          onNodesChange={onNodesChange} 
-          onEdgesChange={onEdgesChange}
-          onConnect={(params) => setEdges((eds) => addEdge(params, eds))}
-          onDrop={onDrop}
-          onDragOver={onDragOver}
-          onNodeClick={(_, node) => {
-            setSelectedNodeId(node.id);
-            // Auto-focus on clicked node
-            setCenter(node.position.x + 250, node.position.y + 100, { zoom: 1.2, duration: 800 });
-          }}
-          onPaneClick={() => setSelectedNodeId(null)}
-          nodeTypes={nodeTypes} 
-          fitView 
-        >
-          <Background variant="dots" gap={30} size={1} color="#E2E8F0" />
-          <Controls className="bg-white rounded-xl border-none shadow-xl" />
-          <MiniMap className="rounded-3xl border-4 border-white shadow-2xl overflow-hidden mb-6 mr-6" />
-        </ReactFlow>
+          nodes={nodes} edges={edges} 
+          onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
+          onConnect={(p) => setEdges((eds) => addEdge(p, eds))}
+          onNodeClick={onNodeClick}
+          onPaneClick={() => { setSelectedNodeId(null); setConnectSource(null); }}
+          nodeTypes={nodeTypes} fitView
+        ><Background color="#E2E8F0" /><Controls /></ReactFlow>
       </div>
-      
-      {/* 6. Properties Panel (Right Sidebar)
-          ZAROORI: key={selectedNodeId} ensures fresh reload on every node switch.
-          nodes.find(...) ensures the panel always gets the latest data from main state.
-      */}
+
       {selectedNodeId && (
         <PropertiesPanel 
-          key={selectedNodeId} 
+          key={selectedNodeId}
           selectedNode={nodes.find(n => n.id === selectedNodeId)} 
-          onUpdate={updateNodeData} 
-          onDelete={(id) => { 
-            setNodes(nds => nds.filter(n => n.id !== id)); 
-            setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
-            setSelectedNodeId(null); 
-          }} 
-          onClose={() => setSelectedNodeId(null)} 
+          onUpdate={(id, data) => setNodes(nds => nds.map(n => n.id === id ? {...n, data} : n))} 
+          onDelete={(id) => { setNodes(nds => nds.filter(n => n.id !== id)); setSelectedNodeId(null); }}
+          onClose={() => setSelectedNodeId(null)}
+          // Extra prop: Connection start karne ke liye
+          onStartConnect={() => setConnectSource(selectedNodeId)}
         />
       )}
     </div>
   );
 };
 
-const FlowBuilder = () => (
-  <ReactFlowProvider>
-    <FlowBuilderContent />
-  </ReactFlowProvider>
-);
-
+const FlowBuilder = () => (<ReactFlowProvider><FlowBuilderContent /></ReactFlowProvider>);
 export default FlowBuilder;
+              
