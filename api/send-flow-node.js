@@ -1,9 +1,18 @@
 import axios from 'axios';
-import { initializeApp, getApps } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 
-// Firebase config (Tumhari purani file se)
-const firebaseConfig = { /* ... tumhari config ... */ };
+// FIXED: Tumhari config yahan poori honi chahiye
+const firebaseConfig = {
+  apiKey: "AIzaSyCDmDsi_JMQgx_QO4p8bnvfh-vKdN4Bmk8",
+  authDomain: "success-points.firebaseapp.com",
+  databaseURL: "https://success-points-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "success-points",
+  storageBucket: "success-points.firebasestorage.app",
+  messagingSenderId: "51177935348",
+  appId: "1:51177935348:web:33fc4a6810790a3cbd29a1",
+  measurementId: "G-64DR1TSTKY"
+};
 
 async function getFirebaseApp() {
   const existingApps = getApps();
@@ -13,7 +22,6 @@ async function getFirebaseApp() {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   
-  // Input: userId, to (number), aur nodeId (Flow Builder wala)
   const { userId, to, nodeId } = req.body;
   if (!userId || !to || !nodeId) return res.status(400).json({ error: "Missing Parameters" });
 
@@ -21,8 +29,9 @@ export default async function handler(req, res) {
     const app = await getFirebaseApp();
     const db = getFirestore(app);
 
-    // 1. User ki Config uthao
+    // 1. User ki Config uthao (Meta Tokens ke liye)
     const configSnap = await getDoc(doc(db, "configs", userId));
+    if (!configSnap.exists()) return res.status(404).json({ error: "User config missing" });
     const { accessToken, phoneId } = configSnap.data();
 
     // 2. Flow Builder ka data uthao
@@ -30,27 +39,26 @@ export default async function handler(req, res) {
     if (!flowSnap.exists()) return res.status(404).json({ error: "Flow not found" });
 
     const flowData = flowSnap.data().flowData;
+    // Node dhoondho jo Webhook ne bheji hai
     const targetNode = flowData.nodes.find(n => n.id === nodeId);
-    if (!targetNode) return res.status(404).json({ error: "Node not found" });
+    if (!targetNode) return res.status(404).json({ error: "Node not found in canvas" });
 
-    // 3. Flow Node se WhatsApp Payload banana
     const blocks = targetNode.data.blocks || [];
     const textBlock = blocks.find(b => b.type === 'text');
-    const buttonBlocks = blocks.filter(b => b.type === 'button').slice(0, 3); // Meta sirf 3 buttons allow karta hai
+    const buttonBlocks = blocks.filter(b => b.type === 'button').slice(0, 3); // WhatsApp limit is 3
 
-    // Interactive Payload Construction
+    // 3. Interactive Payload (WhatsApp Buttons)
     const payload = {
       messaging_product: "whatsapp",
-      recipient_type: "individual",
       to: to.replace(/\D/g, ''),
       type: "interactive",
       interactive: {
         type: "button",
-        body: { text: textBlock?.content || "Select an option:" },
+        body: { text: textBlock?.content || "Please select an option:" },
         action: {
           buttons: buttonBlocks.map(btn => ({
             type: "reply",
-            reply: { id: btn.id, title: btn.label.substring(0, 20) } // Max 20 chars
+            reply: { id: btn.id, title: btn.label.substring(0, 20) } 
           }))
         }
       }
@@ -63,18 +71,20 @@ export default async function handler(req, res) {
 
     const wamid = metaRes.data.messages[0].id;
 
-    // 5. Inbox mein save karna taaki Dashboard par dikhe
+    // 5. History Save (Inbox sync)
     await addDoc(collection(db, "users", userId, "messages"), {
-      text: textBlock?.content || "Interactive Flow Message",
+      text: textBlock?.content || "Sent an interactive message",
       sender: 'admin',
       senderNumber: to,
       wamid: wamid,
+      status: 'sent',
       type: 'interactive',
       timestamp: serverTimestamp()
     });
 
     return res.status(200).json({ success: true, wamid });
   } catch (error) {
+    console.error("API ERROR:", error.response?.data || error.message);
     return res.status(500).json({ error: error.message });
   }
 }
