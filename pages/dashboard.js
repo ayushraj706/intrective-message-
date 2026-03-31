@@ -20,7 +20,7 @@ import InstagramSetup from '../components/setup/InstagramSetup';
 import { Menu, Loader2, Smartphone, Globe, Mail, Bot, Facebook, Instagram } from 'lucide-react'; 
 
 // --- INBOX COMPONENTS (Dynamic) ---
-// FIX: Naye modular path par point kar diya hai
+// FIX: Path ko naye modular folder 'whatsapp' par point kiya hai
 const WhatsAppInbox = dynamic(() => import('../components/inbox/whatsapp/WhatsAppInbox'), { ssr: false });
 const TelegramBotInbox = dynamic(() => import('../components/inbox/TelegramBotInbox'), { ssr: false });
 const TelegramAPIInbox = dynamic(() => import('../components/inbox/TelegramAPIInbox'), { ssr: false });
@@ -48,6 +48,7 @@ export default function Dashboard() {
 
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
       if (user) {
+        // Path: configs/{email_or_uid}
         const unsubscribeConfig = onSnapshot(doc(db, "configs", user.email || user.uid), (docSnap) => {
           if (docSnap.exists()) {
               setSysConfig(docSnap.data());
@@ -78,11 +79,13 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-zinc-50 dark:bg-[#080808] overflow-hidden text-zinc-900 dark:text-white font-sans transition-all duration-500">
       
+      {/* SIDEBAR NODE */}
       <div className={`fixed inset-y-0 left-0 z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'}`}>
         <Sidebar setActiveTab={handleTabChange} activeTab={activeTab} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
       </div>
 
       <main className="flex-1 flex flex-col overflow-hidden relative transition-all duration-300">
+        {/* MOBILE HEADER */}
         <div className="md:hidden flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0a0a0a]">
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-zinc-500"><Menu size={24} /></button>
           <span className="font-black text-lg tracking-tighter text-blue-600 italic uppercase flex-1 text-center ml-4">BaseKey</span>
@@ -156,7 +159,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* RENDERING LOGIC */}
+          {/* MAIN INBOX ROUTING */}
           {activeTab === 'inbox' && (
             <>
               {inboxType === 'whatsapp-setup' && <WhatsAppSetup onBack={() => setInboxType(null)} />}
@@ -174,6 +177,7 @@ export default function Dashboard() {
             </>
           )}
 
+          {/* OTHER SYSTEM PATHS */}
           {activeTab === 'integration' && <AIIntegration onBack={() => setActiveTab('dashboard')} />}
           {activeTab === 'contacts' && <Contacts />}
           {activeTab === 'flow' && <FlowBuilder />}
@@ -183,4 +187,3 @@ export default function Dashboard() {
     </div>
   );
                    }
-            
