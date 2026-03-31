@@ -14,17 +14,18 @@ import TelegramAPISetup from '../components/setup/TelegramAPISetup';
 import TelegramBotSetup from '../components/setup/TelegramBotSetup'; 
 import WhatsAppSetup from '../components/setup/WhatsAppSetup';       
 import GmailSetup from '../components/setup/GmailSetup'; 
-import FacebookSetup from '../components/setup/FacebookSetup'; // Naya
-import InstagramSetup from '../components/setup/InstagramSetup'; // Naya
+import FacebookSetup from '../components/setup/FacebookSetup'; 
+import InstagramSetup from '../components/setup/InstagramSetup'; 
 
 import { Menu, Loader2, Smartphone, Globe, Mail, Bot, Facebook, Instagram } from 'lucide-react'; 
 
 // --- INBOX COMPONENTS (Dynamic) ---
-const WhatsAppInbox = dynamic(() => import('../components/inbox/WhatsAppInbox'), { ssr: false });
+// FIX: Naye modular path par point kar diya hai
+const WhatsAppInbox = dynamic(() => import('../components/inbox/whatsapp/WhatsAppInbox'), { ssr: false });
 const TelegramBotInbox = dynamic(() => import('../components/inbox/TelegramBotInbox'), { ssr: false });
 const TelegramAPIInbox = dynamic(() => import('../components/inbox/TelegramAPIInbox'), { ssr: false });
 const GmailInbox = dynamic(() => import('../components/inbox/GmailInbox'), { ssr: false });
-const InboxBase = dynamic(() => import('../components/inbox/InboxBase'), { ssr: false }); // Universal Inbox
+const InboxBase = dynamic(() => import('../components/inbox/InboxBase'), { ssr: false }); 
 
 const FlowBuilder = dynamic(() => import('../components/FlowBuilder'), { ssr: false });
 
@@ -106,7 +107,7 @@ export default function Dashboard() {
                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Connect Business API</p>
                  </div>
 
-                 {/* MESSENGER CARD (NAYA) */}
+                 {/* MESSENGER CARD */}
                  <div onClick={() => setInboxType(sysConfig?.isFbVerified ? 'messenger-inbox' : 'messenger-setup')} className="bg-[#111] p-10 rounded-[2.5rem] border border-white/5 hover:border-blue-600/30 cursor-pointer transition-all hover:-translate-y-1 group">
                    <div className="w-14 h-14 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-blue-600/10 transition-all">
                      <Facebook size={24} className="text-zinc-400 group-hover:text-blue-600" />
@@ -115,7 +116,7 @@ export default function Dashboard() {
                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Connect Facebook Page</p>
                  </div>
 
-                 {/* INSTAGRAM CARD (NAYA) */}
+                 {/* INSTAGRAM CARD */}
                  <div onClick={() => setInboxType(sysConfig?.isIgVerified ? 'instagram-inbox' : 'instagram-setup')} className="bg-[#111] p-10 rounded-[2.5rem] border border-white/5 hover:border-pink-500/30 cursor-pointer transition-all hover:-translate-y-1 group">
                    <div className="w-14 h-14 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-pink-500/10 transition-all">
                      <Instagram size={24} className="text-zinc-400 group-hover:text-pink-500" />
@@ -182,3 +183,4 @@ export default function Dashboard() {
     </div>
   );
                    }
+            
