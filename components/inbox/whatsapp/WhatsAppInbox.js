@@ -3,8 +3,8 @@ import { db, auth } from '../../../firebase';
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
 import axios from 'axios';
 import { toast } from 'sonner';
+import { MessageSquare } from 'lucide-react'; // MessageSquare import missing tha yahan
 
-// Naye files import karo
 import ChatSidebar from './ChatSidebar';
 import ChatWindow from './ChatWindow';
 import ChatInput from './ChatInput';
@@ -19,25 +19,39 @@ const WhatsAppInbox = ({ onBack }) => {
 
   useEffect(() => {
     if (!currentUserId) return;
-    const q = query(collection(db, "users", currentUserId, "messages"), orderBy("timestamp", "asc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const allMsgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const filteredMsgs = allMsgs.filter(m => !m.platform || m.platform === 'whatsapp');
-      setMessages(filteredMsgs);
-      setRooms([...new Set(filteredMsgs.map(m => m.senderNumber))].filter(Boolean).reverse());
-    });
-    return () => unsubscribe();
+    try {
+      const q = query(collection(db, "users", currentUserId, "messages"), orderBy("timestamp", "asc"));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        if (snapshot.empty) {
+          setMessages([]);
+          setRooms([]);
+          return;
+        }
+        const allMsgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const filteredMsgs = allMsgs.filter(m => m && (!m.platform || m.platform === 'whatsapp'));
+        setMessages(filteredMsgs);
+        
+        // SAFE ROOM LOGIC: Ensure senderNumber is a string before Set
+        const uniqueRooms = [...new Set(filteredMsgs.map(m => String(m.senderNumber || '')))].filter(Boolean).reverse();
+        setRooms(uniqueRooms);
+      });
+      return () => unsubscribe();
+    } catch (err) {
+      console.error("Firebase Error:", err);
+    }
   }, [currentUserId]);
 
   const sendMessage = async (e) => {
     if (e) e.preventDefault();
     if (!inputText.trim() || !selectedRoom) return;
     const textToSend = inputText;
-    const cleanNumber = selectedRoom.replace(/\D/g, ''); 
+    const cleanNumber = String(selectedRoom).replace(/\D/g, ''); 
     setInputText('');
     try {
       await axios.post('/api/send-message', { userId: currentUserId, to: cleanNumber, text: textToSend });
-    } catch (err) { toast.error("WhatsApp failed!"); }
+    } catch (err) { 
+      toast.error("WhatsApp failed!"); 
+    }
   };
 
   return (
@@ -53,7 +67,7 @@ const WhatsAppInbox = ({ onBack }) => {
         {selectedRoom ? (
           <>
             <ChatWindow 
-              messages={messages.filter(m => m.senderNumber === selectedRoom)} 
+              messages={messages.filter(m => String(m.senderNumber) === String(selectedRoom))} 
               selectedRoom={selectedRoom} 
             />
             <ChatInput 
@@ -76,4 +90,3 @@ const WhatsAppInbox = ({ onBack }) => {
 };
 
 export default WhatsAppInbox;
-
