@@ -8,15 +8,15 @@ import { Save, Loader2, Zap, ZapOff, Maximize } from 'lucide-react';
 
 // Firebase Logic
 import { db, auth } from '../../firebase'; 
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 import WhatsAppNode from './WhatsAppNode';
 import StartNode from './StartNode';
-import ListNode from './ListNode'; // Naya List Node import kiya
+import ListNode from './ListNode'; 
 import FlowSidebar from './Sidebar';
 import PropertiesPanel from './PropertiesPanel';
 
-// Node types register kiya
+// Node types registry
 const nodeTypes = { 
   whatsappNode: WhatsAppNode, 
   startNode: StartNode,
@@ -25,7 +25,7 @@ const nodeTypes = {
 
 const FlowBuilderContent = () => {
   const reactFlowWrapper = useRef(null);
-  const { setCenter, fitView, toObject } = useReactFlow(); 
+  const { setCenter, screenToFlowPosition, toObject, fitView } = useReactFlow(); 
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -33,7 +33,7 @@ const FlowBuilderContent = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isBotActive, setIsBotActive] = useState(false);
 
-  // 1. Firebase se Flow Load karna (Safe logic)
+  // 1. Load Flow: Firebase se data lana
   useEffect(() => {
     const loadFlow = async () => {
       if (!auth.currentUser) return;
@@ -50,38 +50,33 @@ const FlowBuilderContent = () => {
             setNodes([{ id: 'start_0', type: 'startNode', position: { x: 50, y: 150 }, data: { title: 'START ROOT' } }]);
           }
           setIsBotActive(isActive || false);
-        } else {
-          setNodes([{ id: 'start_0', type: 'startNode', position: { x: 50, y: 150 }, data: { title: 'START ROOT' } }]);
         }
       } catch (e) { 
-        setNodes([{ id: 'start_0', type: 'startNode', position: { x: 50, y: 150 }, data: { title: 'START ROOT' } }]);
+        console.error("Load Error:", e);
       }
     };
     loadFlow();
   }, [auth.currentUser, setNodes, setEdges]);
 
-  // 2. Node Click logic (Mismatch Fix karne ke liye Center & Select)
-  const handleNodeClick = useCallback((event, node) => {
-    setSelectedNode(node);
-    const { x, y } = node.position;
-    setCenter(x + 250, y + 100, { zoom: 1.2, duration: 800 }); 
-  }, [setCenter, setSelectedNode]);
-
-  // 3. Naya Node jodna (List Menu & Neural Message structure fix)
+  // 2. Add New Node Logic (Mobile Click + Desktop Drop compatible)
   const addNewNode = useCallback((type, position = null) => {
     const id = `node_${Date.now()}`;
-    const spawnPos = position || { x: 400, y: 200 };
+    // Position agar null hai (Click case), toh random middle position set karo
+    const spawnPos = position || { 
+      x: Math.random() * 200 + 300, 
+      y: Math.random() * 200 + 200 
+    };
     
-    // Naye node ke liye default backend structure
+    // Neural Data Structure (Title, Media, Body, Buttons logic)
     const defaultData = type === 'listNode' ? {
-      header: { type: 'text', text: 'LIST TITLE' },
-      body: 'Select an option from our menu:',
-      footer: 'BaseKey List System',
-      listButton: 'View Menu',
-      listRows: [{ id: `r_${Date.now()}`, title: 'Option 1', desc: 'Detail description here' }]
+      header: { type: 'text', text: 'MENU TITLE' },
+      body: 'Select an option below:',
+      footer: 'BaseKey Neural Menu',
+      listButton: 'View Options',
+      listRows: [{ id: `r_${Date.now()}`, title: 'Option 1', desc: 'Description' }]
     } : {
-      header: { type: 'text', text: 'WELCOME TITLE' },
-      body: 'Type your business message here...',
+      header: { type: 'text', text: 'WELCOME' },
+      body: 'Type your business message...',
       footer: '',
       buttons: []
     };
@@ -93,15 +88,38 @@ const FlowBuilderContent = () => {
       data: defaultData,
     };
     setNodes((nds) => nds.concat(newNode));
-  }, [nodes, setNodes]);
+  }, [setNodes]);
 
-  // 4. Central Update handler (Crash-proof logic)
+  // 3. Desktop Drag & Drop Handlers
+  const onDragOver = useCallback((event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onDrop = useCallback((event) => {
+    event.preventDefault();
+    const type = event.dataTransfer.getData('application/reactflow');
+    if (!type) return;
+
+    const position = screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY,
+    });
+
+    addNewNode(type, position);
+  }, [screenToFlowPosition, addNewNode]);
+
+  // 4. Node Click Logic (Zoom and Mismatch prevention)
+  const handleNodeClick = useCallback((event, node) => {
+    setSelectedNode(node);
+    setCenter(node.position.x + 250, node.position.y + 100, { zoom: 1.2, duration: 800 }); 
+  }, [setCenter]);
+
+  // 5. Central Data Sync Logic
   const updateNodeData = useCallback((nodeId, newData) => {
     setNodes((nds) => nds.map((node) => {
       if (node.id === nodeId) {
-        // Naya data merge ho raha hai
         const updatedNode = { ...node, data: { ...node.data, ...newData } };
-        // Agar wahi node selected hai toh state bhi sync karo
         if (selectedNode?.id === nodeId) setSelectedNode(updatedNode);
         return updatedNode;
       }
@@ -113,9 +131,8 @@ const FlowBuilderContent = () => {
     if (!auth.currentUser) return;
     setIsSaving(true);
     try {
-      const flowData = toObject();
       await setDoc(doc(db, "users", auth.currentUser.uid, "flows", "main_flow"), {
-        flowData, 
+        flowData: toObject(),
         updatedAt: new Date().toISOString(),
         isActive: isBotActive
       }, { merge: true });
@@ -123,28 +140,16 @@ const FlowBuilderContent = () => {
     setIsSaving(false);
   };
 
-  const toggleBot = async () => {
-    const newState = !isBotActive;
-    setIsBotActive(newState);
-    if (auth.currentUser) {
-      await updateDoc(doc(db, "users", auth.currentUser.uid, "flows", "main_flow"), { isActive: newState });
-    }
-  };
-
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
+      {/* Sidebar ko onAddNode bheja taaki Click par kaam kare */}
       <FlowSidebar onAddNode={addNewNode} /> 
 
       <div className="flex-1 relative" ref={reactFlowWrapper}>
-        {/* Floating Controls */}
         <div className="absolute top-6 left-6 right-6 z-50 flex justify-between items-center pointer-events-none">
           <div className="flex gap-3 pointer-events-auto">
-             <button onClick={() => fitView({ padding: 0.3 })} className="p-3 bg-white rounded-2xl shadow-xl border border-slate-100 text-slate-600 hover:text-indigo-600 transition-all">
+             <button onClick={() => fitView({ padding: 0.3, duration: 800 })} className="p-3 bg-white rounded-2xl shadow-xl border border-slate-100 text-slate-600 hover:text-indigo-600 transition-all">
                <Maximize size={20} />
-             </button>
-             <button onClick={toggleBot} className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-tighter transition-all ${isBotActive ? 'bg-green-500 text-white shadow-lg shadow-green-200' : 'bg-white text-slate-400 border border-slate-100 shadow-xl'}`}>
-               {isBotActive ? <Zap size={14} className="fill-current"/> : <ZapOff size={14}/>}
-               {isBotActive ? 'Neural Active' : 'Bot Offline'}
              </button>
           </div>
 
@@ -159,6 +164,8 @@ const FlowBuilderContent = () => {
           onNodesChange={onNodesChange} 
           onEdgesChange={onEdgesChange}
           onConnect={(params) => setEdges((eds) => addEdge(params, eds))}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
           onNodeClick={handleNodeClick}
           onPaneClick={() => setSelectedNode(null)}
           nodeTypes={nodeTypes} 
@@ -170,7 +177,7 @@ const FlowBuilderContent = () => {
         </ReactFlow>
       </div>
       
-      {/* MISMATCH FIX: selectedNode.id as key ensures panel resets on node switch */}
+      {/* KEY LOGIC: selectedNode.id as key ensures the panel resets correctly when switching nodes */}
       {selectedNode && (
         <PropertiesPanel 
           key={selectedNode.id} 
@@ -189,10 +196,7 @@ const FlowBuilderContent = () => {
 };
 
 const FlowBuilder = () => (
-  <ReactFlowProvider>
-    <FlowBuilderContent />
-  </ReactFlowProvider>
+  <ReactFlowProvider><FlowBuilderContent /></ReactFlowProvider>
 );
 
 export default FlowBuilder;
-            
