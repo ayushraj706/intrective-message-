@@ -18,17 +18,18 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
 
   const { userId, to, nodeId } = req.body;
+  if (!userId || !to || !nodeId) return res.status(400).json({ error: "Missing parameters" });
+
   const cleanTo = to.replace(/\D/g, '');
 
   try {
-    // 1. WhatsApp Config & Flow Data uthao
     const [configSnap, flowSnap] = await Promise.all([
       getDoc(doc(db, "configs", userId)),
       getDoc(doc(db, "users", userId, "flows", "main_flow"))
     ]);
 
     if (!configSnap.exists() || !flowSnap.exists()) {
-      return res.status(404).json({ error: "Configuration or Flow not found" });
+      return res.status(404).json({ error: "Config or Flow not found" });
     }
 
     const { accessToken, phoneId } = configSnap.data();
@@ -37,19 +38,15 @@ export default async function handler(req, res) {
 
     if (!node) return res.status(404).json({ error: "Node not found" });
 
-    // 2. DYNAMIC VARIABLES FETCHING (Neural Logic)
-    // Maan lo hum 'customers' collection se data uthate hain
+    // 1. NEURAL VARIABLE FETCHING
     const customerSnap = await getDoc(doc(db, "users", userId, "customers", cleanTo));
     const userData = customerSnap.exists() ? customerSnap.data() : { name: "Customer" };
 
-    // Function: Text replace karne ke liye
     const parseVars = (str) => {
       if (!str) return "";
       let temp = str;
-      // System & Custom variables replace karo
       temp = temp.replace(/{{name}}/g, userData.name || "Customer");
       temp = temp.replace(/{{phone}}/g, cleanTo);
-      // Agar businessmen ne koi aur custom var add kiya hai (e.g. {{balance}})
       Object.keys(userData).forEach(key => {
         const regex = new RegExp(`{{${key}}}`, 'g');
         temp = temp.replace(regex, userData[key]);
@@ -58,9 +55,9 @@ export default async function handler(req, res) {
     };
 
     const nodeData = node.data;
-    let payload = { messaging_product: "whatsapp", to: cleanTo, type: "interactive", interactive: {} };
+    let payload = { messaging_product: "whatsapp", recipient_type: "individual", to: cleanTo };
 
-    // 3. HEADER CONSTRUCTION (Media vs Text)
+    // 2. HEADER CONSTRUCTION
     let headerObj = null;
     if (nodeData.header?.type === 'media' && nodeData.header.url) {
       headerObj = { type: "image", image: { link: nodeData.header.url } };
@@ -68,49 +65,62 @@ export default async function handler(req, res) {
       headerObj = { type: "text", text: parseVars(nodeData.header.text) };
     }
 
-    // 4. PAYLOAD CONSTRUCTION (List vs Buttons)
+    // 3. LOGIC BIFURCATION (Text vs Interactive)
+    const buttons = nodeData.buttons || [];
+
     if (node.type === 'listNode') {
-      // --- LIST MESSAGE PAYLOAD ---
+      // --- CASE: LIST MENU ---
+      payload.type = "interactive";
       payload.interactive = {
         type: "list",
-        header: headerObj,
+        header: headerObj?.type === 'text' ? headerObj : undefined, // List supports only text headers
         body: { text: parseVars(nodeData.body) || "Please select an option:" },
         footer: nodeData.footer ? { text: parseVars(nodeData.footer) } : undefined,
         action: {
           button: nodeData.listButton || "View Menu",
           sections: [{
             title: "Options",
-            rows: (nodeData.listRows || []).map(row => ({
+            rows: (nodeData.listRows || []).slice(0, 10).map(row => ({
               id: row.id,
               title: parseVars(row.title).substring(0, 24),
-              description: parseVars(row.desc).substring(0, 72)
+              description: parseVars(row.desc || "").substring(0, 72)
             }))
           }]
         }
       };
-    } else {
-      // --- BUTTON MESSAGE PAYLOAD ---
-      const buttons = nodeData.buttons || [];
-      const hasUrlButton = buttons.find(b => b.type === 'url');
-
-      if (hasUrlButton) {
-        // Meta Rule: Ek message mein sirf 1 URL button ho sakta hai
+    } 
+    else if (buttons.length === 0) {
+      // --- CASE: NO BUTTONS (Fallback to simple text to avoid API errors) ---
+      payload.type = "text";
+      payload.text = { body: parseVars(nodeData.body) };
+    } 
+    else {
+      // --- CASE: BUTTONS (Interactive) ---
+      const urlBtn = buttons.find(b => b.type === 'url' || b.type === 'email');
+      
+      if (urlBtn) {
+        // Meta Rule: CTA URL messages can't mix with reply buttons easily in standard interactive
+        payload.type = "interactive";
         payload.interactive = {
           type: "cta_url",
           header: headerObj,
-          body: { text: parseVars(nodeData.body) || "Check this out:" },
+          body: { text: parseVars(nodeData.body) },
           footer: nodeData.footer ? { text: parseVars(nodeData.footer) } : undefined,
           action: {
             name: "cta_url",
-            parameters: { display_text: hasUrlButton.label, url: hasUrlButton.url }
+            parameters: { 
+              display_text: urlBtn.label.substring(0, 20), 
+              url: urlBtn.type === 'email' ? `mailto:${urlBtn.value}` : urlBtn.value 
+            }
           }
         };
       } else {
-        // Normal Quick Reply Buttons (Max 3)
+        // Quick Reply Buttons (Max 3)
+        payload.type = "interactive";
         payload.interactive = {
           type: "button",
           header: headerObj,
-          body: { text: parseVars(nodeData.body) || "How can I help you?" },
+          body: { text: parseVars(nodeData.body) },
           footer: nodeData.footer ? { text: parseVars(nodeData.footer) } : undefined,
           action: {
             buttons: buttons.slice(0, 3).map(btn => ({
@@ -122,18 +132,19 @@ export default async function handler(req, res) {
       }
     }
 
-    // 5. Meta API Call
+    // 4. EXECUTE META API CALL
     const response = await axios.post(
       `https://graph.facebook.com/v18.0/${phoneId}/messages`,
       payload,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
 
-    // 6. History Save karna (Debugging ke liye)
+    // 5. SAVE HISTORY
     await addDoc(collection(db, "users", userId, "messages"), {
       to: cleanTo,
       nodeId: nodeId,
       status: "sent",
+      type: payload.type,
       wamid: response.data.messages[0].id,
       timestamp: serverTimestamp()
     });
@@ -143,7 +154,7 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error("FLOW SEND ERROR:", error.response?.data || error.message);
     return res.status(500).json({ 
-      error: "Failed to send flow node", 
+      error: "Failed to send message", 
       details: error.response?.data || error.message 
     });
   }
