@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, ImageIcon, Type, Trash2, Plus, Zap, 
-  Database, Upload, Loader2, Link, Smartphone, Layout, ListPlus, Sparkles
+  Database, Upload, Loader2, Link, Smartphone, Layout, ListPlus, Sparkles, ChevronDown
 } from 'lucide-react';
 import { db, auth } from '../../firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -10,7 +10,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
   const nodeData = selectedNode?.data || {};
   
-  // Anti-Crash States: Default values strictly defined
+  // Local States for Instant Feedback
   const [header, setHeader] = useState(nodeData.header || { type: 'text', text: '', url: '' });
   const [body, setBody] = useState(nodeData.body || '');
   const [footer, setFooter] = useState(nodeData.footer || '');
@@ -21,7 +21,7 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
   const [uploading, setUploading] = useState(false);
   const bodyRef = useRef(null);
 
-  // Sync state when node selection changes (Fixes Information Mismatch)
+  // ZAROORI: Jab node badle, local state ko turant refresh karo (No Mismatch)
   useEffect(() => {
     if (selectedNode) {
       setHeader(selectedNode.data?.header || { type: 'text', text: '', url: '' });
@@ -32,7 +32,7 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
     }
   }, [selectedNode?.id]);
 
-  // Load Custom Variables from Firebase
+  // Firebase variables load karo
   useEffect(() => {
     if (!auth.currentUser) return;
     const unsub = onSnapshot(doc(db, "configs", auth.currentUser.uid), (doc) => {
@@ -41,16 +41,17 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
     return () => unsub();
   }, []);
 
-  // Central Sync Function: Updates index.js state
-  const syncToFirebase = (updates) => {
-    onUpdate(selectedNode.id, {
+  // Sync logic: Canvas ko real-time update bhejta hai
+  const handleLiveSync = (updates) => {
+    const updatedData = {
       ...nodeData,
       header: updates.header || header,
       body: updates.body !== undefined ? updates.body : body,
       footer: updates.footer !== undefined ? updates.footer : footer,
       buttons: updates.buttons || buttons,
       listRows: updates.listRows || listRows
-    });
+    };
+    onUpdate(selectedNode.id, updatedData);
   };
 
   const handleMediaUpload = async (e) => {
@@ -70,7 +71,7 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
       const data = await res.json();
       const newHeader = { ...header, type: 'media', url: data.secure_url };
       setHeader(newHeader);
-      syncToFirebase({ header: newHeader });
+      handleLiveSync({ header: newHeader });
     } catch (e) { alert("Media Upload failed!"); }
     setUploading(false);
   };
@@ -81,29 +82,29 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
     const start = textarea.selectionStart;
     const newBody = body.substring(0, start) + `{{${name}}}` + body.substring(textarea.selectionEnd);
     setBody(newBody);
-    syncToFirebase({ body: newBody });
+    handleLiveSync({ body: newBody });
   };
 
   return (
     <motion.aside 
-      key={selectedNode?.id} // Forces React to reset the entire component on node change
+      key={selectedNode?.id} // Panel reset logic when switching nodes
       initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
       className="w-[420px] bg-white border-l h-full flex flex-col shadow-2xl fixed right-0 top-0 z-[100] font-sans"
     >
-      {/* Dynamic Header */}
+      {/* 1. HD HEADER */}
       <div className="p-6 border-b flex justify-between items-center bg-slate-900 text-white sticky top-0 z-20">
         <div>
           <h3 className="text-[10px] font-black uppercase italic tracking-widest text-indigo-400 flex items-center gap-2">
             <Sparkles size={12}/> Neural Architect
           </h3>
-          <p className="text-xs font-bold uppercase">{selectedNode?.type === 'listNode' ? 'List Menu System' : 'Interactive Message'}</p>
+          <p className="text-xs font-bold uppercase">{selectedNode?.type === 'listNode' ? 'Menu Flow Config' : 'Neural Builder'}</p>
         </div>
-        <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-all"><X size={18}/></button>
+        <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-all active:scale-90"><X size={18}/></button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-8 pb-32 bg-slate-50/30 scrollbar-hide">
         
-        {/* 1. VARIABLE INJECTION */}
+        {/* 2. VARIABLE PICKER */}
         <div className="space-y-3">
           <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 tracking-widest px-1">
             <Database size={12}/> Variable Injection
@@ -117,15 +118,15 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
           </div>
         </div>
 
-        {/* 2. MESSAGE STRUCTURE CARDS */}
+        {/* 3. MESSAGE STRUCTURE (Modular Design) */}
         <div className="bg-white p-5 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-slate-100 space-y-6">
            <div className="flex bg-slate-100 p-1.5 rounded-2xl">
-              <button onClick={() => { const h = {...header, type:'text'}; setHeader(h); syncToFirebase({header: h}); }} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-xl transition-all ${header.type === 'text' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-400'}`}>Text Header</button>
-              <button onClick={() => { const h = {...header, type:'media'}; setHeader(h); syncToFirebase({header: h}); }} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-xl transition-all ${header.type === 'media' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-400'}`}>Media Header</button>
+              <button onClick={() => { const h = {...header, type:'text'}; setHeader(h); handleLiveSync({header: h}); }} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-xl transition-all ${header.type === 'text' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-400'}`}>Title Header</button>
+              <button onClick={() => { const h = {...header, type:'media'}; setHeader(h); handleLiveSync({header: h}); }} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-xl transition-all ${header.type === 'media' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-400'}`}>Photo Media</button>
            </div>
 
            {header.type === 'text' ? (
-             <input value={header.text} onChange={(e) => { const h = {...header, text: e.target.value}; setHeader(h); syncToFirebase({header: h}); }} className="w-full p-4 bg-slate-50 border-none rounded-2xl text-xs font-black uppercase outline-none focus:ring-2 focus:ring-indigo-100" placeholder="Header Title Text..." />
+             <input value={header.text} onChange={(e) => { const h = {...header, text: e.target.value}; setHeader(h); handleLiveSync({header: h}); }} className="w-full p-4 bg-slate-50 border-none rounded-2xl text-xs font-black uppercase outline-none focus:ring-2 focus:ring-indigo-100" placeholder="e.g. SPECIAL OFFER" />
            ) : (
              <div className="relative h-40 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center bg-slate-50 hover:border-indigo-400 transition-all overflow-hidden group">
                 {header.url ? (
@@ -133,7 +134,7 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
                 ) : (
                   <div className="flex flex-col items-center gap-1">
                     {uploading ? <Loader2 className="animate-spin text-indigo-500" /> : <Upload className="text-slate-300" />}
-                    <span className="text-[9px] font-black text-slate-400 uppercase italic">Upload Media Content</span>
+                    <span className="text-[9px] font-black text-slate-400 uppercase italic">Media Content</span>
                   </div>
                 )}
                 <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleMediaUpload} />
@@ -141,19 +142,19 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
            )}
 
            <div className="space-y-2">
-              <label className="text-[9px] font-black text-slate-400 uppercase px-2">Main Message Body</label>
-              <textarea ref={bodyRef} value={body} onChange={(e) => { setBody(e.target.value); syncToFirebase({ body: e.target.value }); }} className="w-full bg-slate-50 p-5 text-xs font-medium rounded-3xl border-none outline-none min-h-[140px] focus:ring-2 focus:ring-indigo-100" placeholder="Type your neural message..." />
+              <label className="text-[9px] font-black text-slate-400 uppercase px-2">Message Body</label>
+              <textarea ref={bodyRef} value={body} onChange={(e) => { setBody(e.target.value); handleLiveSync({ body: e.target.value }); }} className="w-full bg-slate-50 p-5 text-xs font-medium rounded-3xl border-none outline-none min-h-[140px] focus:ring-2 focus:ring-indigo-100 leading-relaxed" placeholder="Type your neural message..." />
            </div>
 
            <div className="space-y-2">
               <label className="text-[9px] font-black text-slate-400 uppercase px-2">Footer Label</label>
-              <input value={footer} onChange={(e) => { setFooter(e.target.value); syncToFirebase({ footer: e.target.value }); }} className="w-full p-4 bg-slate-50 border-none rounded-2xl text-[10px] font-bold text-slate-500 outline-none" placeholder="Small gray footer text..." />
+              <input value={footer} onChange={(e) => { setFooter(e.target.value); handleLiveSync({ footer: e.target.value }); }} className="w-full p-4 bg-slate-50 border-none rounded-2xl text-[10px] font-bold text-slate-500 outline-none" placeholder="Small gray text (Optional)" />
            </div>
         </div>
 
-        {/* 3. INTERACTION SECTION (No Blue Plus Icon) */}
+        {/* 4. INTERACTIONS (Dashed Add Button) */}
         <div className="space-y-4">
-           <label className="text-[10px] font-black text-slate-400 uppercase px-2 tracking-widest flex items-center gap-2"><Zap size={12} className="text-yellow-500"/> Interactions</label>
+           <label className="text-[10px] font-black text-slate-400 uppercase px-2 tracking-widest flex items-center gap-2"><Zap size={12} className="text-yellow-500"/> Neural Interactions</label>
            
            <div className="space-y-3">
               {selectedNode?.type === 'listNode' ? (
@@ -161,26 +162,26 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
                   <div key={row.id} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm space-y-2 relative group">
                     <div className="flex justify-between items-center">
                        <span className="text-[9px] font-black text-indigo-500 uppercase italic">Row #{idx + 1}</span>
-                       <button onClick={() => { const up = listRows.filter(r => r.id !== row.id); setListRows(up); syncToFirebase({listRows: up}); }} className="p-1 text-slate-300 hover:text-red-500"><Trash2 size={14}/></button>
+                       <button onClick={() => { const up = listRows.filter(r => r.id !== row.id); setListRows(up); handleLiveSync({listRows: up}); }} className="p-1 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
                     </div>
-                    <input value={row.title} onChange={(e) => { const up = listRows.map(r => r.id === row.id ? {...r, title: e.target.value} : r); setListRows(up); syncToFirebase({listRows: up}); }} className="w-full text-xs font-black uppercase outline-none" placeholder="Option Title" />
-                    <input value={row.desc} onChange={(e) => { const up = listRows.map(r => r.id === row.id ? {...r, desc: e.target.value} : r); setListRows(up); syncToFirebase({listRows: up}); }} className="w-full text-[9px] font-medium text-slate-400 outline-none" placeholder="Row Description" />
+                    <input value={row.title} onChange={(e) => { const up = listRows.map(r => r.id === row.id ? {...r, title: e.target.value} : r); setListRows(up); handleLiveSync({listRows: up}); }} className="w-full text-xs font-black uppercase outline-none" placeholder="Row Title" />
+                    <input value={row.desc} onChange={(e) => { const up = listRows.map(r => r.id === row.id ? {...r, desc: e.target.value} : r); setListRows(up); handleLiveSync({listRows: up}); }} className="w-full text-[9px] font-medium text-slate-400 outline-none" placeholder="Row Description" />
                   </div>
                 ))
               ) : (
                 buttons.map((btn, idx) => (
-                  <div key={btn.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-lg shadow-slate-200/20 space-y-4">
+                  <div key={btn.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-lg shadow-slate-200/20 space-y-4 group">
                     <div className="flex items-center gap-3">
-                       <input value={btn.label} onChange={(e) => { const up = buttons.map(b => b.id === btn.id ? {...b, label: e.target.value} : b); setButtons(up); syncToFirebase({buttons: up}); }} className="flex-1 text-[11px] font-black uppercase outline-none border-b border-slate-100" placeholder="Button Text" />
-                       <select value={btn.type} onChange={(e) => { const up = buttons.map(b => b.id === btn.id ? {...b, type: e.target.value} : b); setButtons(up); syncToFirebase({buttons: up}); }} className="text-[9px] font-black uppercase bg-slate-50 rounded-lg px-2 py-1 outline-none">
+                       <input value={btn.label} onChange={(e) => { const up = buttons.map(b => b.id === btn.id ? {...b, label: e.target.value} : b); setButtons(up); handleLiveSync({buttons: up}); }} className="flex-1 text-[11px] font-black uppercase outline-none border-b border-slate-100 pb-1" placeholder="Button Label" />
+                       <select value={btn.type} onChange={(e) => { const up = buttons.map(b => b.id === btn.id ? {...b, type: e.target.value} : b); setButtons(up); handleLiveSync({buttons: up}); }} className="text-[9px] font-black uppercase bg-slate-50 rounded-lg px-2 py-1 outline-none border-none">
                           <option value="reply">Reply</option>
                           <option value="url">URL Link</option>
                        </select>
-                       <button onClick={() => { const up = buttons.filter(b => b.id !== btn.id); setButtons(up); syncToFirebase({buttons: up}); }} className="text-slate-300 hover:text-red-500 transition-colors"><X size={16}/></button>
+                       <button onClick={() => { const up = buttons.filter(b => b.id !== btn.id); setButtons(up); handleLiveSync({buttons: up}); }} className="text-slate-300 hover:text-red-500 transition-colors"><X size={16}/></button>
                     </div>
                     {btn.type === 'url' && (
                       <div className="flex items-center gap-2 bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100 animate-in slide-in-from-top-2">
-                        <Link size={12} className="text-indigo-400"/><input value={btn.url} onChange={(e) => { const up = buttons.map(b => b.id === btn.id ? {...b, url: e.target.value} : b); setButtons(up); syncToFirebase({buttons: up}); }} className="w-full text-[9px] font-mono text-indigo-600 outline-none bg-transparent" placeholder="https://..." />
+                        <Link size={12} className="text-indigo-400"/><input value={btn.url} onChange={(e) => { const up = buttons.map(b => b.id === btn.id ? {...b, url: e.target.value} : b); setButtons(up); handleLiveSync({buttons: up}); }} className="w-full text-[9px] font-mono text-indigo-600 outline-none bg-transparent" placeholder="https://..." />
                       </div>
                     )}
                   </div>
@@ -188,35 +189,35 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
               )}
            </div>
 
-           {/* Professional Integrated Add Button */}
+           {/* PREMIUM DASHED ADD BUTTON */}
            <button 
              onClick={() => {
                 if (selectedNode?.type === 'listNode') {
                   if (listRows.length >= 10) return;
                   const nr = [...listRows, { id: `row_${Date.now()}`, title: '', desc: '' }];
-                  setListRows(nr); syncToFirebase({ listRows: nr });
+                  setListRows(nr); handleLiveSync({ listRows: nr });
                 } else {
                   if (buttons.length >= 3) return;
-                  const nb = [...buttons, { id: `btn_${Date.now()}`, type: 'reply', label: '', url: '' }];
-                  setButtons(nb); syncToFirebase({ buttons: nb });
+                  const nb = [...buttons, { id: `btn_${Date.now()}`, type: 'reply', label: 'New Button', url: '' }];
+                  setButtons(nb); handleLiveSync({ buttons: nb });
                 }
              }}
              className="w-full py-4 bg-white border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 hover:border-indigo-400 hover:text-indigo-600 transition-all flex items-center justify-center gap-2 group"
            >
              {selectedNode?.type === 'listNode' ? <ListPlus size={16}/> : <Plus size={16}/>}
              <span className="text-[10px] font-black uppercase tracking-widest">
-               {selectedNode?.type === 'listNode' ? 'Add Menu Row' : 'Add Action Button'}
+               {selectedNode?.type === 'listNode' ? 'Add Row' : 'Add Button'}
              </span>
            </button>
         </div>
 
-        {/* 4. REAL PREVIEW SECTION */}
-        <div className="pt-10 border-t">
-           <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 mb-6 tracking-widest px-2"><Smartphone size={16}/> Neural Bubble Preview</label>
+        {/* 5. HD MOCKUP PREVIEW */}
+        <div className="pt-10 border-t px-2">
+           <label className="text-[10px] font-black text-slate-400 uppercase flex items-center gap-2 mb-6 tracking-widest"><Smartphone size={16}/> Neural Bubble Preview</label>
            <div className="bg-[#E5DDD5] p-6 rounded-[3.5rem] border-[10px] border-slate-900 shadow-2xl relative h-[450px] overflow-hidden">
               <div className="bg-white rounded-2xl p-3 shadow-md space-y-2 max-w-[90%] relative animate-in zoom-in-95">
                  <div className="absolute -left-2 top-0 w-4 h-4 bg-white clip-path-triangle rotate-45 shadow-none" />
-                 {header.type === 'media' && header.url && <img src={header.url} className="w-full h-32 object-cover rounded-xl" />}
+                 {header.type === 'media' && header.url && <img src={header.url} className="w-full h-32 object-cover rounded-xl shadow-sm" alt="Preview" />}
                  {header.type === 'text' && header.text && <p className="text-[11px] font-black text-slate-800 uppercase border-b pb-1 border-slate-50">{header.text}</p>}
                  <p className="text-[11px] text-slate-700 leading-relaxed whitespace-pre-wrap">{body || "Your message content..."}</p>
                  {footer && <p className="text-[9px] text-slate-400 font-bold italic">{footer}</p>}
@@ -236,7 +237,7 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
       </div>
 
       <div className="p-6 bg-white border-t mt-auto shadow-2xl">
-        <button onClick={() => onDelete(selectedNode.id)} className="w-full py-4 bg-red-50 text-red-500 border border-red-100 rounded-[2rem] text-[10px] font-black uppercase hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2">
+        <button onClick={() => onDelete(selectedNode.id)} className="w-full py-4 bg-red-50 text-red-500 border border-red-100 rounded-[2rem] text-[10px] font-black uppercase hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2 shadow-sm">
           <Trash2 size={16}/> Destroy Architecture Node
         </button>
       </div>
