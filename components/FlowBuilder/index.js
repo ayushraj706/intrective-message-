@@ -22,8 +22,9 @@ const FlowBuilder = () => {
   const [selectedNode, setSelectedNode] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isBotActive, setIsBotActive] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Sidebar state
 
-  // FIXED: Firebase Load logic with auto StartNode
+  // 1. Firebase Load logic
   useEffect(() => {
     const loadFlow = async () => {
       if (!auth.currentUser) return;
@@ -37,28 +38,37 @@ const FlowBuilder = () => {
             setNodes(flowData.nodes);
             setEdges(flowData.edges || []);
           } else {
-            // IF EMPTY: Add default Start Node
             setNodes([{ id: 'start_0', type: 'startNode', position: { x: 50, y: 150 }, data: {} }]);
           }
           setIsBotActive(isActive || false);
         } else {
-          // NEW USER: Add default Start Node
           setNodes([{ id: 'start_0', type: 'startNode', position: { x: 50, y: 150 }, data: {} }]);
         }
       } catch (e) { 
         console.error("Load error:", e);
-        // Fallback for errors
         setNodes([{ id: 'start_0', type: 'startNode', position: { x: 50, y: 150 }, data: {} }]);
       }
     };
     loadFlow();
   }, [auth.currentUser, setNodes, setEdges]);
 
+  // QUICK DELETE LISTENER
+  useEffect(() => {
+    const handleDelete = (e) => {
+      const nodeId = e.detail;
+      setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+      setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+      if (selectedNode?.id === nodeId) setSelectedNode(null);
+    };
+    window.addEventListener('deleteNode', handleDelete);
+    return () => window.removeEventListener('deleteNode', handleDelete);
+  }, [selectedNode, setNodes, setEdges]);
+
   const addNewNode = useCallback((type, position = null) => {
     const spawnPos = position || { x: 300, y: 300 };
     const newNode = {
       id: `node_${Date.now()}`,
-      type: 'whatsappNode',
+      type: type || 'whatsappNode',
       position: spawnPos,
       data: { 
         title: `Message ${nodes.filter(n => n.type === 'whatsappNode').length + 1}`,
@@ -107,21 +117,21 @@ const FlowBuilder = () => {
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
       <ReactFlowProvider>
-        <FlowSidebar onAddNode={(type) => addNewNode(type)} /> 
+        {/* Sidebar with state */}
+        <FlowSidebar 
+          onAddNode={addNewNode} 
+          isCollapsed={isSidebarCollapsed} 
+          setIsCollapsed={setIsSidebarCollapsed} 
+        /> 
 
         <div className="flex-1 relative bg-slate-50" ref={reactFlowWrapper}>
-          {/* Header Controls */}
           <div className="absolute top-6 left-6 right-6 z-[50] flex justify-between items-center pointer-events-none">
             <div className="bg-white p-1 rounded-full shadow-2xl border border-slate-100 flex gap-1 pointer-events-auto">
-               <button 
-                 onClick={toggleBot}
-                 className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-black text-[10px] uppercase tracking-widest transition-all ${isBotActive ? 'bg-green-500 text-white shadow-lg shadow-green-200' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
-               >
+               <button onClick={toggleBot} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-black text-[10px] uppercase tracking-widest transition-all ${isBotActive ? 'bg-green-500 text-white shadow-lg shadow-green-200' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>
                  {isBotActive ? <Zap size={14} className="fill-current"/> : <ZapOff size={14}/>}
                  {isBotActive ? 'Bot: Online' : 'Bot: Offline'}
                </button>
             </div>
-
             <button onClick={saveFlow} disabled={isSaving} className="pointer-events-auto flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-full font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all">
               {isSaving ? <Loader2 className="animate-spin" size={16}/> : <Save size={16}/>} Save Architecture
             </button>
@@ -137,22 +147,18 @@ const FlowBuilder = () => {
           >
             <Background variant="dots" gap={25} size={1} color="#CBD5E1" />
             <Controls className="bg-white shadow-xl border-none rounded-xl" />
+            {/* IMPROVED MINIMAP: High quality viewer */}
             <MiniMap 
-              nodeColor="#6366f1" 
-              maskColor="rgba(241, 245, 249, 0.7)" 
-              className="rounded-2xl shadow-2xl border-4 border-white mb-4 mr-4"
-              style={{ height: 100, width: 150 }}
+              nodeColor={(n) => n.type === 'startNode' ? '#22c55e' : '#6366f1'} 
+              maskColor="rgba(248, 250, 252, 0.8)" 
+              className="rounded-2xl shadow-2xl border-4 border-white mb-6 mr-6 overflow-hidden"
+              style={{ height: 120, width: 180, background: '#f8fafc' }}
             />
           </ReactFlow>
         </div>
         
         {selectedNode && (
-          <PropertiesPanel 
-            selectedNode={selectedNode} 
-            onUpdate={updateNodeData} 
-            onDelete={(id) => { setNodes(nds => nds.filter(n => n.id !== id)); setSelectedNode(null); }}
-            onClose={() => setSelectedNode(null)}
-          />
+          <PropertiesPanel selectedNode={selectedNode} onUpdate={updateNodeData} onDelete={(id) => { setNodes(nds => nds.filter(n => n.id !== id)); setSelectedNode(null); }} onClose={() => setSelectedNode(null)} />
         )}
       </ReactFlowProvider>
     </div>
@@ -160,4 +166,4 @@ const FlowBuilder = () => {
 };
 
 export default FlowBuilder;
-              
+          
