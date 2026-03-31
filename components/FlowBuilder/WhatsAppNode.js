@@ -1,87 +1,63 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import ReactFlow, { 
-  ReactFlowProvider, addEdge, Background, Controls, 
-  useNodesState, useEdgesState, useReactFlow 
-} from 'reactflow';
-import 'reactflow/dist/style.css';
-import { Save, Loader2, Maximize } from 'lucide-react';
-import { db, auth } from '../../firebase'; 
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import React, { memo } from 'react';
+import { Handle, Position } from 'reactflow';
+import { Smartphone, GripVertical, Link, MessageCircle, Sparkles } from 'lucide-react';
 
-import WhatsAppNode from './WhatsAppNode';
-import StartNode from './StartNode';
-import ListNode from './ListNode'; 
-import FlowSidebar from './Sidebar';
-import PropertiesPanel from './PropertiesPanel';
-
-const nodeTypes = { whatsappNode: WhatsAppNode, startNode: StartNode, listNode: ListNode };
-
-const FlowBuilderContent = () => {
-  const { setCenter, toObject, fitView } = useReactFlow(); 
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [selectedNodeId, setSelectedNodeId] = useState(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    const loadFlow = async () => {
-      if (!auth.currentUser) return;
-      const snap = await getDoc(doc(db, "users", auth.currentUser.uid, "flows", "main_flow"));
-      if (snap.exists()) {
-        setNodes(snap.data().flowData.nodes || []);
-        setEdges(snap.data().flowData.edges || []);
-      }
-    };
-    loadFlow();
-  }, [auth.currentUser, setNodes, setEdges]);
-
-  // NEURAL SYNC: Ye function Canvas ko force-refresh karega
-  const updateNodeData = useCallback((nodeId, newData) => {
-    setNodes((nds) => 
-      nds.map((node) => {
-        if (node.id === nodeId) {
-          // Naya Object Reference banana zaroori hai refresh ke liye
-          return { ...node, data: { ...node.data, ...newData } };
-        }
-        return node;
-      })
-    );
-  }, [setNodes]);
+const WhatsAppNode = ({ data, selected, id }) => {
+  // Safe defaults taaki crash na ho
+  const header = data?.header || { type: 'text', text: '' };
+  const body = data?.body || '';
+  const footer = data?.footer || '';
+  const buttons = data?.buttons || [];
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
-      <FlowSidebar onAddNode={(type) => {
-        const id = `node_${Date.now()}`;
-        setNodes((nds) => nds.concat({ id, type, position: { x: 400, y: 300 }, data: { header: { type: 'text', text: 'WELCOME' }, body: 'Hello!', buttons: [] } }));
-      }} /> 
-      <div className="flex-1 relative">
-        <div className="absolute top-6 left-6 right-6 z-50 flex justify-between pointer-events-none">
-          <button onClick={() => fitView()} className="pointer-events-auto p-3 bg-white rounded-2xl shadow-xl"><Maximize size={20} /></button>
-          <button onClick={async () => { setIsSaving(true); await setDoc(doc(db, "users", auth.currentUser.uid, "flows", "main_flow"), { flowData: toObject() }, { merge: true }); setIsSaving(false); }} className="pointer-events-auto flex items-center gap-3 px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-2xl">
-            {isSaving ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>} Deploy Architecture
-          </button>
+    <div className={`group relative transition-all duration-300 ${selected ? 'scale-105' : 'scale-100'}`}>
+      <div className={`absolute -inset-1 bg-gradient-to-r from-indigo-500 to-violet-600 rounded-[2.2rem] blur opacity-10 ${selected ? 'opacity-30' : 'group-hover:opacity-20'}`}></div>
+      
+      <div className={`relative w-72 bg-white rounded-[2rem] border-2 shadow-2xl overflow-hidden ${selected ? 'border-indigo-500 shadow-indigo-200' : 'border-slate-100'}`}>
+        
+        {/* Connection Points (Top & Bottom flow) */}
+        <Handle type="target" position={Position.Top} className="!w-3 !h-3 !bg-indigo-400 !border-2 !border-white" />
+
+        <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b">
+          <div className="flex items-center gap-2">
+            <div className="p-1 bg-indigo-600 rounded-lg text-white shadow-sm"><Sparkles size={12} /></div>
+            <span className="text-[9px] font-black text-slate-500 uppercase italic tracking-widest">Neural Link</span>
+          </div>
+          <GripVertical size={16} className="text-slate-300" />
         </div>
-        <ReactFlow
-          nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
-          onConnect={(p) => setEdges((eds) => addEdge(p, eds))}
-          onNodeClick={(_, node) => { setSelectedNodeId(node.id); setCenter(node.position.x + 250, node.position.y + 100, { zoom: 1.2, duration: 800 }); }}
-          onPaneClick={() => setSelectedNodeId(null)}
-          nodeTypes={nodeTypes} fitView
-        ><Background color="#E2E8F0" /><Controls /></ReactFlow>
+
+        <div className="p-4 bg-[#E5DDD5]/40 space-y-2">
+          <div className="bg-white rounded-2xl p-2.5 shadow-sm space-y-2 relative border-l-4 border-indigo-400">
+            {header.type === 'media' && header.url ? (
+              <img src={header.url} className="w-full h-24 object-cover rounded-xl" alt="Media" />
+            ) : header.text ? (
+              <p className="text-[9px] font-black text-slate-800 uppercase border-b pb-1">{header.text}</p>
+            ) : null}
+
+            <p className="text-[11px] text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">
+              {body || "Start typing in the editor..."}
+            </p>
+            {footer && <p className="text-[8px] font-bold text-slate-400 italic mt-1">{footer}</p>}
+          </div>
+
+          {/* Interactive Buttons with Source Handles */}
+          <div className="space-y-1.5 pt-1">
+            {buttons.map((btn) => (
+              <div key={btn.id} className="relative">
+                <div className="w-full py-2.5 bg-white text-indigo-600 rounded-xl text-[10px] font-black text-center border border-indigo-100 shadow-sm flex items-center justify-center gap-1.5">
+                  {btn.type === 'url' ? <Link size={10}/> : <MessageCircle size={10}/>}
+                  {btn.label || "New Button"}
+                </div>
+                {btn.type === 'reply' && (
+                  <Handle type="source" position={Position.Bottom} id={btn.id} className="!w-2.5 !h-2.5 !bg-indigo-600 !border-2 !border-white !-bottom-1" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-      {selectedNodeId && (
-        <PropertiesPanel 
-          key={selectedNodeId}
-          selectedNode={nodes.find(n => n.id === selectedNodeId)} 
-          onUpdate={updateNodeData} 
-          onDelete={(id) => { setNodes(nds => nds.filter(n => n.id !== id)); setSelectedNodeId(null); }}
-          onClose={() => setSelectedNodeId(null)} 
-        />
-      )}
     </div>
   );
 };
 
-const FlowBuilder = () => (<ReactFlowProvider><FlowBuilderContent /></ReactFlowProvider>);
-export default FlowBuilder;
-            
+export default memo(WhatsAppNode);
