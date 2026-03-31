@@ -3,7 +3,7 @@ import ReactFlow, {
   ReactFlowProvider, addEdge, Background, Controls, MiniMap, useNodesState, useEdgesState 
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Save, Loader2, Play, Zap, ZapOff } from 'lucide-react';
+import { Save, Loader2, Zap, ZapOff } from 'lucide-react';
 import { db, auth } from '../../firebase'; 
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 
@@ -21,29 +21,39 @@ const FlowBuilder = () => {
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [isBotActive, setIsBotActive] = useState(false); // Bot ON/OFF state
+  const [isBotActive, setIsBotActive] = useState(false);
 
-  // 1. Firebase Load logic
+  // FIXED: Firebase Load logic with auto StartNode
   useEffect(() => {
     const loadFlow = async () => {
       if (!auth.currentUser) return;
       try {
         const docRef = doc(db, "users", auth.currentUser.uid, "flows", "main_flow");
         const docSnap = await getDoc(docRef);
+        
         if (docSnap.exists()) {
           const { flowData, isActive } = docSnap.data();
-          if (flowData) {
-            setNodes(flowData.nodes || []);
+          if (flowData && flowData.nodes && flowData.nodes.length > 0) {
+            setNodes(flowData.nodes);
             setEdges(flowData.edges || []);
+          } else {
+            // IF EMPTY: Add default Start Node
+            setNodes([{ id: 'start_0', type: 'startNode', position: { x: 50, y: 150 }, data: {} }]);
           }
           setIsBotActive(isActive || false);
+        } else {
+          // NEW USER: Add default Start Node
+          setNodes([{ id: 'start_0', type: 'startNode', position: { x: 50, y: 150 }, data: {} }]);
         }
-      } catch (e) { console.error("Load error:", e); }
+      } catch (e) { 
+        console.error("Load error:", e);
+        // Fallback for errors
+        setNodes([{ id: 'start_0', type: 'startNode', position: { x: 50, y: 150 }, data: {} }]);
+      }
     };
     loadFlow();
   }, [auth.currentUser, setNodes, setEdges]);
 
-  // 2. Add Node function
   const addNewNode = useCallback((type, position = null) => {
     const spawnPos = position || { x: 300, y: 300 };
     const newNode = {
@@ -51,7 +61,7 @@ const FlowBuilder = () => {
       type: 'whatsappNode',
       position: spawnPos,
       data: { 
-        title: `Message ${nodes.length + 1}`,
+        title: `Message ${nodes.filter(n => n.type === 'whatsappNode').length + 1}`,
         blocks: [{ id: `blk_${Date.now()}`, type: 'text', content: 'Type your neural message...' }] 
       },
     };
@@ -69,7 +79,6 @@ const FlowBuilder = () => {
     }));
   };
 
-  // 3. Save & Activate logic
   const saveFlow = async () => {
     if (!reactFlowInstance || !auth.currentUser) return;
     setIsSaving(true);
@@ -151,4 +160,4 @@ const FlowBuilder = () => {
 };
 
 export default FlowBuilder;
-                     
+              
