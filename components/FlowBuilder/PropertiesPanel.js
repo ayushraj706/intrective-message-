@@ -33,7 +33,8 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
         <button onClick={onClose} className="p-2 hover:bg-white hover:shadow-sm rounded-xl transition-all text-slate-400 hover:text-indigo-600"><X size={20} /></button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      {/* Scroll Area with extra padding for mobile keyboard */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-48">
         {blocks.map((block, idx) => (
           <div key={block.id} className="group relative bg-slate-50 rounded-3xl border border-slate-100 p-5 transition-all hover:border-indigo-200 hover:bg-white hover:shadow-xl hover:shadow-indigo-500/5">
             <button 
@@ -49,10 +50,11 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
                   <Type size={14} className="text-indigo-500" />
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Message Block {idx + 1}</label>
                 </div>
+                {/* FIXED: added text-slate-900 and font-medium */}
                 <textarea 
                   value={block.content || ''}
                   onChange={(e) => handleFieldUpdate(block.id, 'content', e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-[13px] outline-none focus:ring-2 ring-indigo-500/10 focus:border-indigo-500 min-h-[120px] resize-none transition-all"
+                  className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-[14px] text-slate-900 font-medium outline-none focus:ring-2 ring-indigo-500/10 focus:border-indigo-500 min-h-[120px] resize-none transition-all"
                   placeholder="What should the bot say?"
                 />
               </div>
@@ -64,11 +66,12 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
                     {block.subType === 'url' ? 'External Link' : 'Interactive Button'}
                   </label>
                 </div>
+                {/* FIXED: added text-slate-900 and font-bold */}
                 <input 
                   type="text" 
                   value={block.label || ''} 
                   onChange={(e) => handleFieldUpdate(block.id, 'label', e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-bold outline-none focus:border-indigo-500"
+                  className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs text-slate-900 font-bold outline-none focus:border-indigo-500"
                   placeholder="Button Text"
                 />
                 {block.subType === 'url' && (
@@ -85,7 +88,6 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
           </div>
         ))}
 
-        {/* Add Elements Section */}
         <div className="pt-6 border-t border-slate-100">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
             <Layers size={12} /> Add Component
@@ -106,7 +108,6 @@ const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
         </div>
       </div>
 
-      {/* Footer Actions */}
       <div className="p-6 bg-slate-50 border-t border-slate-100">
         <button onClick={() => onDelete(selectedNode.id)} className="w-full p-4 bg-red-50 text-red-500 rounded-2xl text-[11px] font-bold hover:bg-red-500 hover:text-white transition-all border border-red-100 shadow-sm flex items-center justify-center gap-2">
           <Trash2 size={16} /> DELETE NODE
