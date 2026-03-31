@@ -1,195 +1,104 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import ReactFlow, { 
-  ReactFlowProvider, addEdge, Background, Controls, MiniMap, 
-  useNodesState, useEdgesState, useReactFlow 
-} from 'reactflow';
-import 'reactflow/dist/style.css';
-import { Save, Loader2, Maximize, Zap, ZapOff } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { X, Upload, Loader2, Database, Zap, Sparkles, Plus, Trash2, Link } from 'lucide-react';
+import { db, auth } from '../../firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
-// Firebase Logic
-import { db, auth } from '../../firebase'; 
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
-
-import WhatsAppNode from './WhatsAppNode';
-import StartNode from './StartNode';
-import ListNode from './ListNode'; 
-import FlowSidebar from './Sidebar';
-import PropertiesPanel from './PropertiesPanel';
-
-// Node types registry
-const nodeTypes = { 
-  whatsappNode: WhatsAppNode, 
-  startNode: StartNode,
-  listNode: ListNode 
-};
-
-const FlowBuilderContent = () => {
-  const reactFlowWrapper = useRef(null);
-  const { setCenter, screenToFlowPosition, toObject, fitView } = useReactFlow(); 
+const PropertiesPanel = ({ selectedNode, onUpdate, onDelete, onClose }) => {
+  const [uploading, setUploading] = useState(false);
+  const [customVars, setCustomVars] = useState([]);
+  const bodyRef = useRef(null);
   
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [selectedNodeId, setSelectedNodeId] = useState(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isBotActive, setIsBotActive] = useState(false);
+  // Direct shortcut to node data for easy access
+  const nodeData = selectedNode.data;
 
-  // 1. Firebase se Flow Load karna
   useEffect(() => {
-    const loadFlow = async () => {
-      if (!auth.currentUser) return;
-      try {
-        const docRef = doc(db, "users", auth.currentUser.uid, "flows", "main_flow");
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          const { flowData, isActive } = docSnap.data();
-          if (flowData?.nodes?.length > 0) {
-            setNodes(flowData.nodes);
-            setEdges(flowData.edges || []);
-          } else {
-            // Default Start Node if flow is empty
-            setNodes([{ id: 'start_0', type: 'startNode', position: { x: 50, y: 150 }, data: { title: 'START ROOT' } }]);
-          }
-          setIsBotActive(isActive || false);
-        }
-      } catch (e) { 
-        console.error("Load Error:", e);
-      }
-    };
-    loadFlow();
-  }, [auth.currentUser, setNodes, setEdges]);
-
-  // 2. LIVE UPDATE FUNCTION: Canvas ko refresh karne wala logic
-  const updateNodeData = useCallback((nodeId, newData) => {
-    setNodes((nds) => 
-      nds.map((node) => {
-        if (node.id === nodeId) {
-          // ZAROORI: Naya reference {...node} aur {...node.data} create karna padega refresh ke liye
-          return { 
-            ...node, 
-            data: { ...node.data, ...newData } 
-          };
-        }
-        return node;
-      })
-    );
-  }, [setNodes]);
-
-  // 3. Naya Node jodna (Mobile Click + Desktop Drop compatible)
-  const addNewNode = useCallback((type, position = null) => {
-    const id = `node_${Date.now()}`;
-    const spawnPos = position || { 
-      x: Math.random() * 200 + 300, 
-      y: Math.random() * 200 + 200 
-    };
-    
-    const defaultData = type === 'listNode' ? {
-      header: { type: 'text', text: 'LIST TITLE' },
-      body: 'Select an option:',
-      footer: 'BaseKey System',
-      listButton: 'View Menu',
-      listRows: [{ id: `r_${Date.now()}`, title: 'Option 1', desc: '' }]
-    } : {
-      header: { type: 'text', text: 'MESSAGE TITLE' },
-      body: 'Type your message...',
-      footer: '',
-      buttons: []
-    };
-
-    const newNode = {
-      id,
-      type: type || 'whatsappNode',
-      position: spawnPos,
-      data: defaultData,
-    };
-    setNodes((nds) => nds.concat(newNode));
-  }, [setNodes]);
-
-  // 4. Desktop Drag & Drop Handlers
-  const onDrop = useCallback((event) => {
-    event.preventDefault();
-    const type = event.dataTransfer.getData('application/reactflow');
-    if (!type) return;
-    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-    addNewNode(type, position);
-  }, [screenToFlowPosition, addNewNode]);
-
-  // 5. Save Flow to Firebase
-  const saveFlow = async () => {
     if (!auth.currentUser) return;
-    setIsSaving(true);
+    const unsub = onSnapshot(doc(db, "configs", auth.currentUser.uid), (doc) => {
+      if (doc.exists()) setCustomVars(doc.data().customVariables || []);
+    });
+    return () => unsub();
+  }, []);
+
+  // REAL-TIME SYNC: Har change par index.js ko call karega
+  const update = (updates) => {
+    onUpdate(selectedNode.id, { ...nodeData, ...updates });
+  };
+
+  const handleMedia = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "basekey_preset");
     try {
-      await setDoc(doc(db, "users", auth.currentUser.uid, "flows", "main_flow"), {
-        flowData: toObject(),
-        updatedAt: new Date().toISOString(),
-        isActive: isBotActive
-      }, { merge: true });
-    } catch (e) { console.error("Save Error", e); }
-    setIsSaving(false);
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
+      const d = await res.json();
+      update({ header: { ...nodeData.header, url: d.secure_url, type: 'media' } });
+    } catch (e) { alert("Upload Failed!"); }
+    setUploading(false);
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
-      <FlowSidebar onAddNode={addNewNode} /> 
+    <motion.aside initial={{ x: '100%' }} animate={{ x: 0 }} className="w-[420px] bg-white border-l h-full flex flex-col shadow-2xl fixed right-0 top-0 z-[100] font-sans">
+      <div className="p-6 border-b flex justify-between items-center bg-slate-900 text-white sticky top-0 z-20">
+        <div className="flex items-center gap-2"><Sparkles size={16} className="text-indigo-400" /><h3 className="text-xs font-black uppercase tracking-widest">Neural Editor</h3></div>
+        <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-all"><X size={18}/></button>
+      </div>
 
-      <div className="flex-1 relative" ref={reactFlowWrapper}>
-        {/* Floating Top UI */}
-        <div className="absolute top-6 left-6 right-6 z-50 flex justify-between items-center pointer-events-none">
-          <div className="flex gap-3 pointer-events-auto">
-             <button onClick={() => fitView({ padding: 0.3, duration: 800 })} className="p-3 bg-white rounded-2xl shadow-xl border border-slate-100 text-slate-600">
-               <Maximize size={20} />
-             </button>
-          </div>
-
-          <button onClick={saveFlow} disabled={isSaving} className="pointer-events-auto flex items-center gap-3 px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-2xl hover:bg-indigo-600 transition-all">
-            {isSaving ? <Loader2 className="animate-spin" size={16}/> : <Save size={16}/>} 
-            Deploy Architecture
-          </button>
+      <div className="flex-1 overflow-y-auto p-6 space-y-8 pb-32 bg-slate-50/30 scrollbar-hide">
+        {/* Variables Picker */}
+        <div className="flex flex-wrap gap-2">
+          {customVars.map(v => (
+            <button key={v.id} onClick={() => {
+              const start = bodyRef.current.selectionStart;
+              const nb = (nodeData.body || "").substring(0, start) + `{{${v.name}}}` + (nodeData.body || "").substring(start);
+              update({ body: nb });
+            }} className="px-3 py-1.5 bg-white text-indigo-600 text-[10px] font-black rounded-xl border border-indigo-100 shadow-sm">{`{{${v.name}}}`}</button>
+          ))}
         </div>
 
-        <ReactFlow
-          nodes={nodes} edges={edges} 
-          onNodesChange={onNodesChange} 
-          onEdgesChange={onEdgesChange}
-          onConnect={(params) => setEdges((eds) => addEdge(params, eds))}
-          onDrop={onDrop}
-          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
-          onNodeClick={(_, node) => {
-            setSelectedNodeId(node.id);
-            setCenter(node.position.x + 250, node.position.y + 100, { zoom: 1.2, duration: 800 });
-          }}
-          onPaneClick={() => setSelectedNodeId(null)}
-          nodeTypes={nodeTypes} 
-          fitView 
-        >
-          <Background variant="dots" gap={30} size={1} color="#E2E8F0" />
-          <Controls />
-        </ReactFlow>
+        {/* Message Content Card */}
+        <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-6">
+           <div className="flex bg-slate-100 p-1.5 rounded-2xl">
+              <button onClick={() => update({ header: { ...nodeData.header, type: 'text' } })} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-xl transition-all ${nodeData.header?.type === 'text' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-400'}`}>Title</button>
+              <button onClick={() => update({ header: { ...nodeData.header, type: 'media' } })} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-xl transition-all ${nodeData.header?.type === 'media' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-400'}`}>Media</button>
+           </div>
+
+           {nodeData.header?.type === 'text' ? (
+             <input value={nodeData.header?.text || ''} onChange={(e) => update({ header: { ...nodeData.header, text: e.target.value } })} className="w-full p-4 bg-slate-50 border-none rounded-2xl text-xs font-black outline-none focus:ring-2 focus:ring-indigo-100 uppercase" placeholder="Header Title..." />
+           ) : (
+             <div className="relative h-40 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center bg-slate-50 overflow-hidden">
+                {nodeData.header?.url ? <img src={nodeData.header.url} className="w-full h-full object-cover" /> : <div className="flex flex-col items-center gap-1">{uploading ? <Loader2 className="animate-spin text-indigo-600" /> : <Upload className="text-slate-300" />}<span className="text-[9px] font-black uppercase text-slate-400 italic">Media Content</span></div>}
+                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleMedia} />
+             </div>
+           )}
+
+           <textarea ref={bodyRef} value={nodeData.body || ''} onChange={(e) => update({ body: e.target.value })} className="w-full bg-slate-50 p-5 text-xs font-medium rounded-3xl border-none outline-none min-h-[140px] focus:ring-4 focus:ring-indigo-50" placeholder="Type neural message..." />
+           <input value={nodeData.footer || ''} onChange={(e) => update({ footer: e.target.value })} className="w-full p-4 bg-slate-50 border-none rounded-2xl text-[10px] font-bold text-slate-500 outline-none" placeholder="Small footer text..." />
+        </div>
+
+        {/* Buttons Section */}
+        <div className="space-y-4">
+           <label className="text-[10px] font-black text-slate-400 uppercase px-2 flex items-center gap-2"><Zap size={12} className="text-yellow-500"/> Neural Interactions</label>
+           <div className="space-y-3">
+              {(nodeData.buttons || []).map(btn => (
+                <div key={btn.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-lg space-y-4">
+                  <div className="flex items-center gap-3">
+                     <input value={btn.label} onChange={(e) => update({ buttons: nodeData.buttons.map(b => b.id === btn.id ? { ...b, label: e.target.value } : b) })} className="flex-1 text-[11px] font-black uppercase outline-none border-b border-slate-100 pb-1" placeholder="Label" />
+                     <button onClick={() => update({ buttons: nodeData.buttons.filter(b => b.id !== btn.id) })} className="text-red-400 hover:scale-110 transition-transform"><Trash2 size={16}/></button>
+                  </div>
+                </div>
+              ))}
+              <button onClick={() => update({ buttons: [...(nodeData.buttons || []), { id: `b_${Date.now()}`, label: 'New Button', type: 'reply' }] })} className="w-full py-4 bg-white border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 hover:border-indigo-400 hover:text-indigo-600 transition-all flex items-center justify-center gap-2 group"><Plus size={16}/> <span className="text-[10px] font-black uppercase tracking-widest">Add Button</span></button>
+           </div>
+        </div>
       </div>
-      
-      {/* ZAROORI FIX: 
-          1. key={selectedNodeId} se panel har node switch par fresh reload hota hai.
-          2. nodes.find(...) se hamesha latest state data panel ko milta hai.
-      */}
-      {selectedNodeId && (
-        <PropertiesPanel 
-          key={selectedNodeId} 
-          selectedNode={nodes.find(n => n.id === selectedNodeId)} 
-          onUpdate={updateNodeData} 
-          onDelete={(id) => { 
-            setNodes(nds => nds.filter(n => n.id !== id)); 
-            setEdges(eds => eds.filter(e => e.source !== id && e.target !== id));
-            setSelectedNodeId(null); 
-          }} 
-          onClose={() => setSelectedNodeId(null)} 
-        />
-      )}
-    </div>
+      <div className="p-6 bg-white border-t mt-auto shadow-2xl"><button onClick={() => onDelete(selectedNode.id)} className="w-full py-4 bg-red-50 text-red-500 border border-red-100 rounded-[2rem] text-[10px] font-black uppercase hover:bg-red-500 transition-all flex items-center justify-center gap-2 shadow-sm"><Trash2 size={16}/> Destroy Node</button></div>
+    </motion.aside>
   );
 };
 
-const FlowBuilder = () => (
-  <ReactFlowProvider><FlowBuilderContent /></ReactFlowProvider>
-);
-
-export default FlowBuilder;
+export default PropertiesPanel;
+                                                         
