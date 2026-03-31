@@ -26,91 +26,114 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const body = req.body;
-    const value = body.entry?.[0]?.changes?.[0]?.value;
+    const value = req.body.entry?.[0]?.changes?.[0]?.value;
     if (!value) return res.status(200).send("OK");
 
     try {
-      // 1. INCOMING MESSAGE HANDLING (Full Data)
+      // 1. --- HAR TARAH KE MESSAGES KO PAKADNA ---
       if (value.messages && value.messages[0]) {
         const msg = value.messages[0];
         const contact = value.contacts?.[0];
         const senderNumber = msg.from;
         const senderName = contact?.profile?.name || "Customer";
         
-        let incomingText = "";
+        let incomingContent = "";
         let clickedButtonId = null;
+        let extraData = {};
 
-        if (msg.type === 'text') incomingText = msg.text.body;
-        else if (msg.type === 'interactive') {
-          clickedButtonId = msg.interactive.button_reply?.id;
-          incomingText = `🔘 ${msg.interactive.button_reply?.title}`;
+        // Switch case for every Meta feature
+        switch (msg.type) {
+          case 'text':
+            incomingContent = msg.text.body;
+            break;
+          case 'interactive':
+            clickedButtonId = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id;
+            incomingContent = `🔘 ${msg.interactive.button_reply?.title || msg.interactive.list_reply?.title}`;
+            break;
+          case 'image':
+          case 'video':
+          case 'audio':
+          case 'document':
+            incomingContent = `📎 Received ${msg.type}`;
+            extraData = { mediaId: msg[msg.type].id, mime: msg[msg.type].mime_type, sha256: msg[msg.type].sha256 };
+            break;
+          case 'location':
+            incomingContent = `📍 Location: ${msg.location.latitude}, ${msg.location.longitude}`;
+            extraData = { lat: msg.location.latitude, long: msg.location.longitude, name: msg.location.name };
+            break;
+          case 'reaction':
+            incomingContent = `Reacted: ${msg.reaction.emoji}`;
+            extraData = { reactedTo: msg.reaction.message_id, emoji: msg.reaction.emoji };
+            break;
+          case 'button': // Quick reply from templates
+            incomingContent = msg.button.text;
+            clickedButtonId = msg.button.payload;
+            break;
+          default:
+            incomingContent = `Unsupported Message Type: ${msg.type}`;
         }
 
-        // Pichhla saara data + naye metadata parameters
+        // --- DATABASE SAVE (Pro Level) ---
         await addDoc(collection(db, "users", userId, "messages"), {
-          text: incomingText,
+          text: incomingContent,
           sender: 'customer',
           senderNumber,
           senderName,
           wamid: msg.id,
           platform: 'whatsapp',
           status: 'received',
-          messageType: msg.type,
+          type: msg.type,
           timestamp: serverTimestamp(),
-          metadata: {
-            display_phone: value.metadata?.display_phone_number,
-            phone_id: value.metadata?.phone_number_id
-          }
+          metaData: { ...extraData, phone_id: value.metadata?.phone_number_id }
         });
 
-        // 2. AUTOMATION: Flow Trigger (Wait for reply before ending)
+        // 2. --- AUTOMATION: MULTI-NODE FLOW TRIGGER ---
         const flowSnap = await getDoc(doc(db, "users", userId, "flows", "main_flow"));
         if (flowSnap.exists() && flowSnap.data().isActive) {
           const { flowData } = flowSnap.data();
           const edges = flowData.edges || [];
-          const nodes = flowData.nodes || [];
-          let nextNodeId = null;
+          let targetNodeIds = [];
 
           if (clickedButtonId) {
-            const edge = edges.find(e => e.sourceHandle === clickedButtonId);
-            if (edge) nextNodeId = edge.target;
-          } else {
-            const startNode = nodes.find(n => n.type === 'startNode');
+            // Find ALL connected nodes (Multi-Reply)
+            targetNodeIds = edges.filter(e => e.sourceHandle === clickedButtonId).map(e => e.target);
+          } else if (msg.type === 'text') {
+            // First time Hi trigger
+            const startNode = flowData.nodes.find(n => n.type === 'startNode');
             if (startNode) {
-              const startEdge = edges.find(e => e.source === startNode.id);
-              if (startEdge) nextNodeId = startEdge.target;
+              targetNodeIds = edges.filter(e => e.source === startNode.id).map(e => e.target);
             }
           }
 
-          if (nextNodeId) {
+          // Trigger all connected nodes in parallel
+          if (targetNodeIds.length > 0) {
             const protocol = req.headers['x-forwarded-proto'] || 'https';
             const baseUrl = `${protocol}://${req.headers.host}`;
-            // AWAIT LAGANA ZAROORI HAI: Taaki Vercel function kill na kare
-            await axios.post(`${baseUrl}/api/send-flow-node`, {
-              userId, to: senderNumber, nodeId: nextNodeId
-            }).catch(e => console.log("Flow Send Err:", e.message));
+            await Promise.all(targetNodeIds.map(nodeId => 
+              axios.post(`${baseUrl}/api/send-flow-node`, { userId, to: senderNumber, nodeId })
+            ));
           }
         }
       }
 
-      // 3. STATUS UPDATES (Ticks Sync)
+      // 3. --- STATUS UPDATES (Full Tracking) ---
       if (value.statuses && value.statuses[0]) {
         const statusObj = value.statuses[0];
-        const q = query(collection(db, "users", userId, "messages"), where("wamid", "==", statusObj.id));
+        const wamid = statusObj.id;
+        const currentStatus = statusObj.status;
+        
+        const q = query(collection(db, "users", userId, "messages"), where("wamid", "==", wamid));
         const snap = await getDocs(q);
-        snap.forEach(async (document) => {
-          await updateDoc(document.ref, { 
-            status: statusObj.status, 
-            last_status_update: serverTimestamp() 
+        snap.forEach(async (d) => {
+          await updateDoc(d.ref, { 
+            status: currentStatus, 
+            error: statusObj.errors ? statusObj.errors[0] : null,
+            updatedAt: serverTimestamp() 
           });
         });
       }
 
       return res.status(200).send("OK");
-    } catch (error) {
-      console.error("WEBHOOK ERROR:", error.message);
-      return res.status(200).send("Error Logged");
-    }
+    } catch (error) { return res.status(200).send("Error Handled"); }
   }
 }
