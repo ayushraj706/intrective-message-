@@ -1,9 +1,12 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import ReactFlow, { 
-  ReactFlowProvider, addEdge, Background, Controls, MiniMap, useNodesState, useEdgesState 
+  ReactFlowProvider, addEdge, Background, Controls, MiniMap, 
+  useNodesState, useEdgesState, useReactFlow 
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Save, Loader2, Zap, ZapOff } from 'lucide-react';
+import { Save, Loader2, Zap, ZapOff, Maximize } from 'lucide-react';
+
+// Firebase Logic
 import { db, auth } from '../../firebase'; 
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 
@@ -14,15 +17,18 @@ import PropertiesPanel from './PropertiesPanel';
 
 const nodeTypes = { whatsappNode: WhatsAppNode, startNode: StartNode };
 
-const FlowBuilder = () => {
+// ZAROORI: Hooks use karne ke liye content ko alag component mein rakha hai
+const FlowBuilderContent = () => {
   const reactFlowWrapper = useRef(null);
+  const { setCenter, fitView } = useReactFlow(); // ReactFlow Hooks
+  
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isBotActive, setIsBotActive] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Sidebar state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // 1. Firebase Load logic
   useEffect(() => {
@@ -52,7 +58,20 @@ const FlowBuilder = () => {
     loadFlow();
   }, [auth.currentUser, setNodes, setEdges]);
 
-  // QUICK DELETE LISTENER
+  // 2. Auto-Zoom & Center Logic: Node click par bara dikhega
+  const handleNodeClick = useCallback((event, node) => {
+    setSelectedNode(node);
+    const { x, y } = node.position;
+    // zoom: 1.5 taaki content ekdam clear dikhe
+    setCenter(x + 150, y + 100, { zoom: 1.5, duration: 800 }); 
+  }, [setCenter, setSelectedNode]);
+
+  // 3. Fit View function: Poore flow ko screen par layega
+  const handleFitView = () => {
+    fitView({ padding: 0.2, duration: 800 });
+  };
+
+  // 4. Quick Delete Listener
   useEffect(() => {
     const handleDelete = (e) => {
       const nodeId = e.detail;
@@ -116,54 +135,82 @@ const FlowBuilder = () => {
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
-      <ReactFlowProvider>
-        {/* Sidebar with state */}
-        <FlowSidebar 
-          onAddNode={addNewNode} 
-          isCollapsed={isSidebarCollapsed} 
-          setIsCollapsed={setIsSidebarCollapsed} 
-        /> 
+      <FlowSidebar 
+        onAddNode={addNewNode} 
+        isCollapsed={isSidebarCollapsed} 
+        setIsCollapsed={setIsSidebarCollapsed} 
+      /> 
 
-        <div className="flex-1 relative bg-slate-50" ref={reactFlowWrapper}>
-          <div className="absolute top-6 left-6 right-6 z-[50] flex justify-between items-center pointer-events-none">
-            <div className="bg-white p-1 rounded-full shadow-2xl border border-slate-100 flex gap-1 pointer-events-auto">
-               <button onClick={toggleBot} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-black text-[10px] uppercase tracking-widest transition-all ${isBotActive ? 'bg-green-500 text-white shadow-lg shadow-green-200' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>
-                 {isBotActive ? <Zap size={14} className="fill-current"/> : <ZapOff size={14}/>}
-                 {isBotActive ? 'Bot: Online' : 'Bot: Offline'}
-               </button>
-            </div>
-            <button onClick={saveFlow} disabled={isSaving} className="pointer-events-auto flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-full font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all">
-              {isSaving ? <Loader2 className="animate-spin" size={16}/> : <Save size={16}/>} Save Architecture
-            </button>
+      <div className="flex-1 relative bg-slate-50" ref={reactFlowWrapper}>
+        {/* Header Controls: Multi-button layout */}
+        <div className="absolute top-6 left-6 right-6 z-[50] flex justify-between items-center pointer-events-none">
+          <div className="flex gap-3 pointer-events-auto">
+             {/* Fit View Button */}
+             <button 
+               onClick={handleFitView}
+               className="p-3 bg-white rounded-full shadow-lg text-slate-500 hover:text-indigo-600 transition-all border border-slate-100"
+               title="Center Canvas"
+             >
+               <Maximize size={18} />
+             </button>
+
+             {/* Bot Status Toggle */}
+             <button 
+               onClick={toggleBot} 
+               className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-black text-[10px] uppercase tracking-widest transition-all ${isBotActive ? 'bg-green-500 text-white shadow-lg shadow-green-200' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+             >
+               {isBotActive ? <Zap size={14} className="fill-current"/> : <ZapOff size={14}/>}
+               {isBotActive ? 'Bot: Online' : 'Bot: Offline'}
+             </button>
           </div>
 
-          <ReactFlow
-            nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
-            onConnect={(params) => setEdges((eds) => addEdge(params, eds))}
-            onInit={setReactFlowInstance}
-            onNodeClick={(e, node) => setSelectedNode(node)}
-            onPaneClick={() => setSelectedNode(null)}
-            nodeTypes={nodeTypes} fitView snapToGrid={true}
-          >
-            <Background variant="dots" gap={25} size={1} color="#CBD5E1" />
-            <Controls className="bg-white shadow-xl border-none rounded-xl" />
-            {/* IMPROVED MINIMAP: High quality viewer */}
-            <MiniMap 
-              nodeColor={(n) => n.type === 'startNode' ? '#22c55e' : '#6366f1'} 
-              maskColor="rgba(248, 250, 252, 0.8)" 
-              className="rounded-2xl shadow-2xl border-4 border-white mb-6 mr-6 overflow-hidden"
-              style={{ height: 120, width: 180, background: '#f8fafc' }}
-            />
-          </ReactFlow>
+          <button onClick={saveFlow} disabled={isSaving} className="pointer-events-auto flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-full font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all">
+            {isSaving ? <Loader2 className="animate-spin" size={16}/> : <Save size={16}/>} Save Architecture
+          </button>
         </div>
-        
-        {selectedNode && (
-          <PropertiesPanel selectedNode={selectedNode} onUpdate={updateNodeData} onDelete={(id) => { setNodes(nds => nds.filter(n => n.id !== id)); setSelectedNode(null); }} onClose={() => setSelectedNode(null)} />
-        )}
-      </ReactFlowProvider>
+
+        <ReactFlow
+          nodes={nodes} edges={edges} 
+          onNodesChange={onNodesChange} 
+          onEdgesChange={onEdgesChange}
+          onConnect={(params) => setEdges((eds) => addEdge(params, eds))}
+          onInit={setReactFlowInstance}
+          onNodeClick={handleNodeClick} // FIXED: Auto-zoom logic call
+          onPaneClick={() => setSelectedNode(null)}
+          nodeTypes={nodeTypes} 
+          fitView 
+          snapToGrid={true}
+        >
+          <Background variant="dots" gap={25} size={1} color="#CBD5E1" />
+          <Controls className="bg-white shadow-xl border-none rounded-xl" />
+          
+          <MiniMap 
+            nodeColor={(n) => n.type === 'startNode' ? '#22c55e' : '#6366f1'} 
+            maskColor="rgba(248, 250, 252, 0.8)" 
+            className="rounded-2xl shadow-2xl border-4 border-white mb-6 mr-6 overflow-hidden"
+            style={{ height: 120, width: 180, background: '#f8fafc' }}
+          />
+        </ReactFlow>
+      </div>
+      
+      {selectedNode && (
+        <PropertiesPanel 
+          selectedNode={selectedNode} 
+          onUpdate={updateNodeData} 
+          onDelete={(id) => { setNodes(nds => nds.filter(n => n.id !== id)); setSelectedNode(null); }} 
+          onClose={() => setSelectedNode(null)} 
+        />
+      )}
     </div>
   );
 };
 
+// ReactFlow Provider Wrapper (Hooks ki accessibility ke liye)
+const FlowBuilder = () => (
+  <ReactFlowProvider>
+    <FlowBuilderContent />
+  </ReactFlowProvider>
+);
+
 export default FlowBuilder;
-          
+  
