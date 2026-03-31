@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
-import { db, auth } from '../firebase'; 
+import { db, auth } from '../../../firebase'; 
 import { doc, onSnapshot } from 'firebase/firestore'; 
 import Sidebar from '../components/Sidebar';
 import MainDashboard from '../components/MainDashboard';
