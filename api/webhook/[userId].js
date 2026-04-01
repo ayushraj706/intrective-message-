@@ -2,6 +2,7 @@ import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, addDoc, updateDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
 import axios from "axios";
 
+// --- FIREBASE CONFIG (Wahi rakha hai jo aapne diya tha) ---
 const firebaseConfig = {
   apiKey: "AIzaSyCDmDsi_JMQgx_QO4p8bnvfh-vKdN4Bmk8",
   authDomain: "success-points.firebaseapp.com",
@@ -17,20 +18,34 @@ const db = getFirestore(app);
 export default async function handler(req, res) {
   const { userId } = req.query;
 
+  // --- 1. GET METHOD (Meta Verification Handshake) ---
   if (req.method === 'GET') {
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
-    const userSnap = await getDoc(doc(db, "configs", userId));
-    if (userSnap.exists() && token === userSnap.data().webhookVerifyToken) return res.status(200).send(challenge);
+    
+    // User ka config fetch karo verification token check karne ke liye
+    const userRef = doc(db, "configs", userId);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists() && token === userSnap.data().webhookVerifyToken) {
+      // --- NAYA LOGIC: Automatically set verified to true ---
+      await updateDoc(userRef, { 
+        isVerified: true, 
+        lastVerifiedAt: serverTimestamp() 
+      });
+      
+      return res.status(200).send(challenge);
+    }
     return res.status(403).send('Failed');
   }
 
+  // --- 2. POST METHOD (Receiving Messages & Status) ---
   if (req.method === 'POST') {
     const value = req.body.entry?.[0]?.changes?.[0]?.value;
     if (!value) return res.status(200).send("OK");
 
     try {
-      // 1. --- HAR TARAH KE MESSAGES KO PAKADNA ---
+      // --- MESSAGES LOGIC (Purana data safe hai) ---
       if (value.messages && value.messages[0]) {
         const msg = value.messages[0];
         const contact = value.contacts?.[0];
@@ -41,11 +56,8 @@ export default async function handler(req, res) {
         let clickedButtonId = null;
         let extraData = {};
 
-        // Switch case for every Meta feature
         switch (msg.type) {
-          case 'text':
-            incomingContent = msg.text.body;
-            break;
+          case 'text': incomingContent = msg.text.body; break;
           case 'interactive':
             clickedButtonId = msg.interactive.button_reply?.id || msg.interactive.list_reply?.id;
             incomingContent = `🔘 ${msg.interactive.button_reply?.title || msg.interactive.list_reply?.title}`;
@@ -55,25 +67,24 @@ export default async function handler(req, res) {
           case 'audio':
           case 'document':
             incomingContent = `📎 Received ${msg.type}`;
-            extraData = { mediaId: msg[msg.type].id, mime: msg[msg.type].mime_type, sha256: msg[msg.type].sha256 };
+            extraData = { mediaId: msg[msg.type].id, mime: msg[msg.type].mime_type };
             break;
           case 'location':
             incomingContent = `📍 Location: ${msg.location.latitude}, ${msg.location.longitude}`;
-            extraData = { lat: msg.location.latitude, long: msg.location.longitude, name: msg.location.name };
+            extraData = { lat: msg.location.latitude, long: msg.location.longitude };
             break;
           case 'reaction':
             incomingContent = `Reacted: ${msg.reaction.emoji}`;
-            extraData = { reactedTo: msg.reaction.message_id, emoji: msg.reaction.emoji };
+            extraData = { emoji: msg.reaction.emoji };
             break;
-          case 'button': // Quick reply from templates
+          case 'button':
             incomingContent = msg.button.text;
             clickedButtonId = msg.button.payload;
             break;
-          default:
-            incomingContent = `Unsupported Message Type: ${msg.type}`;
+          default: incomingContent = `Unsupported: ${msg.type}`;
         }
 
-        // --- DATABASE SAVE (Pro Level) ---
+        // Database mein save (metadata mein phone_id bhi save ho raha hai)
         await addDoc(collection(db, "users", userId, "messages"), {
           text: incomingContent,
           sender: 'customer',
@@ -87,7 +98,7 @@ export default async function handler(req, res) {
           metaData: { ...extraData, phone_id: value.metadata?.phone_number_id }
         });
 
-        // 2. --- AUTOMATION: MULTI-NODE FLOW TRIGGER ---
+        // Flow Automation Trigger Logic (Wahi purana rakha hai)
         const flowSnap = await getDoc(doc(db, "users", userId, "flows", "main_flow"));
         if (flowSnap.exists() && flowSnap.data().isActive) {
           const { flowData } = flowSnap.data();
@@ -95,17 +106,12 @@ export default async function handler(req, res) {
           let targetNodeIds = [];
 
           if (clickedButtonId) {
-            // Find ALL connected nodes (Multi-Reply)
             targetNodeIds = edges.filter(e => e.sourceHandle === clickedButtonId).map(e => e.target);
           } else if (msg.type === 'text') {
-            // First time Hi trigger
             const startNode = flowData.nodes.find(n => n.type === 'startNode');
-            if (startNode) {
-              targetNodeIds = edges.filter(e => e.source === startNode.id).map(e => e.target);
-            }
+            if (startNode) targetNodeIds = edges.filter(e => e.source === startNode.id).map(e => e.target);
           }
 
-          // Trigger all connected nodes in parallel
           if (targetNodeIds.length > 0) {
             const protocol = req.headers['x-forwarded-proto'] || 'https';
             const baseUrl = `${protocol}://${req.headers.host}`;
@@ -116,18 +122,14 @@ export default async function handler(req, res) {
         }
       }
 
-      // 3. --- STATUS UPDATES (Full Tracking) ---
+      // --- STATUS UPDATES ---
       if (value.statuses && value.statuses[0]) {
         const statusObj = value.statuses[0];
-        const wamid = statusObj.id;
-        const currentStatus = statusObj.status;
-        
-        const q = query(collection(db, "users", userId, "messages"), where("wamid", "==", wamid));
+        const q = query(collection(db, "users", userId, "messages"), where("wamid", "==", statusObj.id));
         const snap = await getDocs(q);
         snap.forEach(async (d) => {
           await updateDoc(d.ref, { 
-            status: currentStatus, 
-            error: statusObj.errors ? statusObj.errors[0] : null,
+            status: statusObj.status, 
             updatedAt: serverTimestamp() 
           });
         });
