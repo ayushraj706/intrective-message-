@@ -2,9 +2,9 @@ import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, addDoc, updateDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
 import axios from "axios";
 
-// --- FIREBASE CONFIG (Wahi rakha hai jo aapne diya tha) ---
+// --- FIREBASE CONFIG ---
 const firebaseConfig = {
-  apiKey: "AIzaSyCDmDsi_JMQgx_QO4p8bnvfh-vKdN4Bmk8",
+  apiKey: process.env.FIREBASE_API_KEY || "AIzaSyCDmDsi_JMQgx_QO4p8bnvfh-vKdN4Bmk8", // Recommendation: Use .env
   authDomain: "success-points.firebaseapp.com",
   projectId: "success-points",
   storageBucket: "success-points.firebasestorage.app",
@@ -23,31 +23,51 @@ export default async function handler(req, res) {
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
     
-    // User ka config fetch karo verification token check karne ke liye
     const userRef = doc(db, "configs", userId);
     const userSnap = await getDoc(userRef);
 
     if (userSnap.exists() && token === userSnap.data().webhookVerifyToken) {
-      // --- NAYA LOGIC: Automatically set verified to true ---
+      console.log(`[Verification] User ${userId} verified successfully.`);
       await updateDoc(userRef, { 
         isVerified: true, 
         lastVerifiedAt: serverTimestamp() 
       });
-      
       return res.status(200).send(challenge);
     }
+    console.error(`[Verification Failed] Token mismatch for user ${userId}`);
     return res.status(403).send('Failed');
   }
 
   // --- 2. POST METHOD (Receiving Messages & Status) ---
   if (req.method === 'POST') {
-    const value = req.body.entry?.[0]?.changes?.[0]?.value;
+    const entry = req.body.entry?.[0];
+    const changes = entry?.changes?.[0];
+    const value = changes?.value;
+
     if (!value) return res.status(200).send("OK");
 
     try {
-      // --- MESSAGES LOGIC (Purana data safe hai) ---
+      // --- CHATWOOT FEATURE 1: Inactive Number Check ---
+      const phoneNumber = value.metadata?.display_phone_number;
+      const configSnap = await getDoc(doc(db, "globalConfigs", "whatsapp")); 
+      const inactiveNumbers = configSnap.exists() ? configSnap.data().inactiveNumbers || [] : [];
+
+      if (inactiveNumbers.includes(phoneNumber)) {
+        console.warn(`[Rejected] Webhook for inactive WhatsApp number: ${phoneNumber}`);
+        return res.status(422).json({ error: 'Inactive WhatsApp number' });
+      }
+
+      // --- MESSAGES LOGIC ---
       if (value.messages && value.messages[0]) {
         const msg = value.messages[0];
+        
+        // --- CHATWOOT FEATURE 2: Echo Prevention ---
+        // Agar message humne hi API se bheja hai, toh use ignore karein (duplicate loop rokne ke liye)
+        if (msg.from === phoneNumber) {
+            console.log("[Echo] Ignoring self-sent message");
+            return res.status(200).send("OK");
+        }
+
         const contact = value.contacts?.[0];
         const senderNumber = msg.from;
         const senderName = contact?.profile?.name || "Customer";
@@ -56,6 +76,7 @@ export default async function handler(req, res) {
         let clickedButtonId = null;
         let extraData = {};
 
+        // Aapka purana Switch logic (Sahi hai)
         switch (msg.type) {
           case 'text': incomingContent = msg.text.body; break;
           case 'interactive':
@@ -84,7 +105,9 @@ export default async function handler(req, res) {
           default: incomingContent = `Unsupported: ${msg.type}`;
         }
 
-        // Database mein save (metadata mein phone_id bhi save ho raha hai)
+        console.log(`[Incoming Message] From: ${senderNumber}, Type: ${msg.type}`);
+
+        // Database mein save
         await addDoc(collection(db, "users", userId, "messages"), {
           text: incomingContent,
           sender: 'customer',
@@ -98,7 +121,7 @@ export default async function handler(req, res) {
           metaData: { ...extraData, phone_id: value.metadata?.phone_number_id }
         });
 
-        // Flow Automation Trigger Logic (Wahi purana rakha hai)
+        // Flow Automation (Purana Logic)
         const flowSnap = await getDoc(doc(db, "users", userId, "flows", "main_flow"));
         if (flowSnap.exists() && flowSnap.data().isActive) {
           const { flowData } = flowSnap.data();
@@ -115,14 +138,15 @@ export default async function handler(req, res) {
           if (targetNodeIds.length > 0) {
             const protocol = req.headers['x-forwarded-proto'] || 'https';
             const baseUrl = `${protocol}://${req.headers.host}`;
-            await Promise.all(targetNodeIds.map(nodeId => 
-              axios.post(`${baseUrl}/api/send-flow-node`, { userId, to: senderNumber, nodeId })
-            ));
+            // Background ki tarah trigger karein (Vercel optimization)
+            targetNodeIds.forEach(nodeId => {
+                axios.post(`${baseUrl}/api/send-flow-node`, { userId, to: senderNumber, nodeId }).catch(e => console.error("Flow error", e.message));
+            });
           }
         }
       }
 
-      // --- STATUS UPDATES ---
+      // --- STATUS UPDATES (Purana logic safe hai) ---
       if (value.statuses && value.statuses[0]) {
         const statusObj = value.statuses[0];
         const q = query(collection(db, "users", userId, "messages"), where("wamid", "==", statusObj.id));
@@ -135,7 +159,11 @@ export default async function handler(req, res) {
         });
       }
 
+      // Meta ko 200 OK turant bhej dein
       return res.status(200).send("OK");
-    } catch (error) { return res.status(200).send("Error Handled"); }
+    } catch (error) { 
+      console.error(`[Webhook Error] User: ${userId}, Error: ${error.message}`);
+      return res.status(200).send("Error Handled"); 
+    }
   }
 }
