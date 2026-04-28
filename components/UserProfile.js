@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { LogOut, ChevronUp, User, Shield, Settings, Moon, Sun } from 'lucide-react';
+import { LogOut, ChevronUp, User, Shield, Settings } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { auth, db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -7,15 +7,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const UserProfile = ({ isCollapsed }) => {
   const router = useRouter();
-  const menuRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [userData, setUserData] = useState({ name: 'Admin', email: '' });
   const [isLoading, setIsLoading] = useState(true);
 
   // Click outside to close
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
         setShowProfileMenu(false);
       }
     };
@@ -83,7 +83,7 @@ const UserProfile = ({ isCollapsed }) => {
 
   return (
     <div className="mt-auto relative" ref={menuRef}>
-      {/* ─── Profile Dropdown Menu ─── */}
+      {/* Profile Dropdown Menu */}
       <AnimatePresence>
         {showProfileMenu && (
           <motion.div
@@ -108,7 +108,7 @@ const UserProfile = ({ isCollapsed }) => {
                   <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">{userData.email || "No email"}</p>
                 </div>
               </div>
-              <div className="mt-3 flex items-center gap-1.5">
+              <div className="mt-3 flex items-center gap-1. items-center gap-1.5">
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   Online
@@ -141,7 +141,7 @@ const UserProfile = ({ isCollapsed }) => {
         )}
       </AnimatePresence>
 
-      {/* ─── Main Profile Button ─── */}
+      {/* Main Profile Button */}
       <motion.button
         onClick={toggleMenu}
         whileHover={{ scale: 1.01 }}
@@ -196,8 +196,8 @@ const UserProfile = ({ isCollapsed }) => {
   );
 };
 
-// ─── Menu Item Component ───
-const MenuItem = ({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) => (
+// Menu Item Component
+const MenuItem = ({ icon, label, onClick }) => (
   <motion.button
     onClick={onClick}
     whileHover={{ x: 2 }}
