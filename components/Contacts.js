@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { db, auth } from '../firebase'; 
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // ─── WhatsApp Logo SVG ───
 const WhatsAppIcon = () => (
@@ -23,7 +24,8 @@ const Contacts = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+  const [syncStatus, setSyncStatus] = useState('idle');
+  const [toast, setToast] = useState({ message: '', visible: false });
   const user = auth.currentUser;
 
   // ─── Network Status Listener ───
@@ -38,6 +40,12 @@ const Contacts = () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
+  }, []);
+
+  // ─── Toast Notification ───
+  const showToast = useCallback((message) => {
+    setToast({ message, visible: true });
+    setTimeout(() => setToast({ message: '', visible: false }), 3000);
   }, []);
 
   // ─── Load from localStorage FIRST (Instant!) ───
@@ -102,13 +110,11 @@ const Contacts = () => {
     const hasCache = loadFromCache();
     
     if (hasCache) {
-      setIsLoading(false); // Instant show!
-      // Background sync from cloud
+      setIsLoading(false);
       if (isOnline && user) {
         loadFromCloud();
       }
     } else {
-      // No cache, must load from cloud
       loadFromCloud();
     }
   }, [loadFromCache, loadFromCloud, isOnline, user]);
@@ -208,8 +214,6 @@ const Contacts = () => {
       saveToCache(updatedList);
       await syncToCloud(updatedList);
       setIsUploading(false);
-      
-      // Toast notification
       showToast(`${newNumbers.length} contacts imported successfully!`);
     };
     
@@ -219,7 +223,7 @@ const Contacts = () => {
     };
     
     reader.readAsText(file);
-  }, [extractedContacts, saveToCache, syncToCloud]);
+  }, [extractedContacts, saveToCache, syncToCloud, showToast]);
 
   // ─── Delete Contact ───
   const deleteContact = useCallback(async (numToDelete) => {
@@ -238,14 +242,6 @@ const Contacts = () => {
       await syncToCloud([]);
     }
   }, [syncToCloud]);
-
-  // ─── Toast Notification ───
-  const [toast, setToast] = useState<{message: string, visible: boolean}>({ message: '', visible: false });
-  
-  const showToast = useCallback((message: string) => {
-    setToast({ message, visible: true });
-    setTimeout(() => setToast({ message: '', visible: false }), 3000);
-  }, []);
 
   // ─── Filtered Contacts ───
   const filteredContacts = useMemo(() => 
@@ -427,7 +423,7 @@ const Contacts = () => {
 
         {/* ─── Footer ─── */}
         <div className="mt-6 flex items-center justify-between text-xs text-zinc-400">
-          <p>Last synced: {localStorage.getItem(LAST_SYNC_KEY) ? new Date(localStorage.getItem(LAST_SYNC_KEY)!).toLocaleString() : 'Never'}</p>
+          <p>Last synced: {localStorage.getItem(LAST_SYNC_KEY) ? new Date(localStorage.getItem(LAST_SYNC_KEY)).toLocaleString() : 'Never'}</p>
           <p>{filteredContacts.length} of {extractedContacts.length} shown</p>
         </div>
       </div>
@@ -512,8 +508,5 @@ const EmptyState = ({ hasContacts }) => (
     </p>
   </div>
 );
-
-// ─── AnimatePresence wrapper for toast ───
-const AnimatePresence = ({ children }) => children;
 
 export default Contacts;
