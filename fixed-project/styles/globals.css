@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    /* Light Mode by default */
+    @apply bg-zinc-50 text-zinc-900 transition-colors duration-300;
+  }
+  
+  /* Dark Mode specific background */
+  .dark body {
+    @apply bg-[#050505] text-white;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .styled-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .styled-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .styled-scrollbar::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 4px;
+  }
+}
